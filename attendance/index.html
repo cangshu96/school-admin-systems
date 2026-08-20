@@ -14,7 +14,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>级部考勤系统 - 云端版</title>
 <script src="https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+// ============ 按需加载库 ============
+const __CDN = {
+  chart: 'https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+  xlsx: 'https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+};
+function loadLib(name) {
+  return new Promise((resolve, reject) => {
+    const globalName = name === 'chart' ? 'Chart' : 'XLSX';
+    if (window[globalName]) return resolve();
+    const s = document.createElement('script');
+    s.src = __CDN[name];
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ reject(new Error('加载' + name + '库失败，请检查网络')); };
+    document.head.appendChild(s);
+  });
+}
+
+
 <style>
 :root {
   --primary: #1677ff; --primary-light: #e6f0ff; --primary-dark: #0958d9;
@@ -1871,7 +1889,8 @@ function renderStatsSummary(dates, byDate) {
   document.getElementById('statsSummary').innerHTML = html;
 }
 
-function renderStatsCharts(dates, byDate) {
+async function renderStatsCharts(dates, byDate) {
+  await loadLib('chart').catch(e => showToast(e.message, 'error'));
   const container = document.getElementById('statsCharts');
   // Chart 1: Daily attendance trend (line)
   const dailyData = dates.map(d => {
