@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.7.1</title>
+<title>巡课汇总反馈系统 v2.7.2</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -323,6 +323,34 @@ body {
   .app-header h1 { font-size: 15px; }
   .summary-table { font-size: 11px; }
 }
+/* ===== 移动端适配增强 ===== */
+html { -webkit-text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
+@media (max-width: 600px) {
+  body { font-size: 15px; }
+  .class-card { padding: 12px; }
+  .class-card .class-name { font-size: 17px; }
+  .class-card .class-info, .class-card .subject-teacher { font-size: 13px; }
+  .score-row { flex-wrap: wrap; gap: 6px; }
+  .score-row .item-name { font-size: 14px; min-width: 58px; }
+  .grade-btns { flex: 1; justify-content: flex-end; gap: 6px; }
+  .grade-btn { padding: 10px 0; font-size: 15px; min-width: 0; flex: 1; max-width: 76px; }
+  .reason-input { margin-left: 0; width: 100%; }
+  .remark-input { min-width: 0; }
+  .special-row { flex-wrap: wrap; }
+  .special-badge { margin-left: 0; }
+  .period-bar .time-info { font-size: 12px; }
+  .summary-table { font-size: 12px; }
+  .tab-btn { min-width: 62px; padding: 12px 6px; font-size: 14px; }
+  .photo-thumb { width: 44px; height: 44px; }
+  .settings-table { font-size: 12px; }
+  .summary-bar { gap: 6px; }
+}
+@media (max-width: 420px) {
+  .score-row .item-name { min-width: 52px; font-size: 13px; }
+  .grade-btn { font-size: 14px; }
+  .photo-btn { padding: 8px 12px; }
+}
 </style>
 </head>
 <body>
@@ -339,7 +367,7 @@ body {
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.7.1</div>
+    <div class="version">v2.7.2</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
     <div class="form-group">
       <label>备课组</label>
@@ -375,7 +403,7 @@ body {
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.7.1</span></h1>
+    <h1>📋 巡课汇总 <span class="ver">v2.7.2</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -1507,37 +1535,7 @@ function exportFeedbackWord() {
   html += '.section { margin-top: 12pt; }';
   html += '.good { color: #52c41a; }';
   html += '.bad { color: #ff4d4f; }';
-  html += '
-/* ===== 移动端适配增强 ===== */
-html { -webkit-text-size-adjust: 100%; }
-body { -webkit-tap-highlight-color: transparent; }
-@media (max-width: 600px) {
-  body { font-size: 15px; }
-  .class-card { padding: 12px; }
-  .class-card .class-name { font-size: 17px; }
-  .class-card .class-info, .class-card .subject-teacher { font-size: 13px; }
-  .score-row { flex-wrap: wrap; gap: 6px; }
-  .score-row .item-name { font-size: 14px; min-width: 58px; }
-  .grade-btns { flex: 1; justify-content: flex-end; gap: 6px; }
-  .grade-btn { padding: 10px 0; font-size: 15px; min-width: 0; flex: 1; max-width: 76px; }
-  .reason-input { margin-left: 0; width: 100%; }
-  .remark-input { min-width: 0; }
-  .special-row { flex-wrap: wrap; }
-  .special-badge { margin-left: 0; }
-  .period-bar .time-info { font-size: 12px; }
-  .summary-table { font-size: 12px; }
-  .tab-btn { min-width: 62px; padding: 12px 6px; font-size: 14px; }
-  .photo-thumb { width: 44px; height: 44px; }
-  .settings-table { font-size: 12px; }
-  .summary-bar { gap: 6px; }
-}
-@media (max-width: 420px) {
-  .score-row .item-name { min-width: 52px; font-size: 13px; }
-  .grade-btn { font-size: 14px; }
-  .photo-btn { padding: 8px 12px; }
-}
-
-</style></head><body>';
+  html += '</style></head><body>';
   html += '<h1>武汉市二桥中学巡堂反馈</h1>';
   html += '<div class="subtitle">' + date + '（周' + weekday + '） · 巡课人：' + (state.teacher || '') + '</div>';
   
