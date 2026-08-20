@@ -516,8 +516,26 @@ body {
 </div>
 
 <script src="https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+// ============ 按需加载库 ============
+const __CDN = {
+  chart: 'https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+  xlsx: 'https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+};
+function loadLib(name) {
+  return new Promise((resolve, reject) => {
+    const globalName = name === 'chart' ? 'Chart' : 'XLSX';
+    if (window[globalName]) return resolve();
+    const s = document.createElement('script');
+    s.src = __CDN[name];
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ reject(new Error('加载' + name + '库失败，请检查网络')); };
+    document.head.appendChild(s);
+  });
+}
+
+
+
 <script>
 // ============================================
 // 配置
@@ -1778,6 +1796,7 @@ async function updatePeriod(period, field, value) {
 let statsChart1 = null, statsChart2 = null;
 
 async function renderStats() {
+  await loadLib('chart').catch(e => showToast(e.message, 'error'));
   const range = document.getElementById('statsRange').value;
   const dates = getStatsDates(range);
   if (dates.length === 0) { showToast('没有数据', 'error'); return; }
@@ -1928,7 +1947,8 @@ function refreshAllUI() {
 }
 
 // --- 班级管理 ---
-function exportClassesTemplate() {
+async function exportClassesTemplate() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
   const data = state.classes.map(c => ({ 班级名称: c.name, 排序: c.sort_order || 0 }));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
@@ -1938,6 +1958,7 @@ function exportClassesTemplate() {
 }
 
 async function importClasses(input) {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
   const file = input.files[0];
   if (!file) return;
   try {
@@ -1973,7 +1994,8 @@ async function importClasses(input) {
 }
 
 // --- 教师管理 ---
-function exportTeachersTemplate() {
+async function exportTeachersTemplate() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
   const data = state.teachers.map(t => ({ 姓名: t.name, 备课组: t.group_name, 排序: t.sort_order || 0 }));
   if (data.length === 0) {
     // Export template with group options
@@ -1992,6 +2014,7 @@ function exportTeachersTemplate() {
 }
 
 async function importTeachers(input) {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
   const file = input.files[0];
   if (!file) return;
   try {
@@ -2027,7 +2050,8 @@ async function importTeachers(input) {
 }
 
 // --- 课表配置 ---
-function exportScheduleTemplate() {
+async function exportScheduleTemplate() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
   if (state.classes.length === 0) { showToast('请先添加班级', 'error'); return; }
   // Build schedule data: each row = one class, columns = periods (subject|teacher)
   const headers = ['班级'];
@@ -2050,6 +2074,7 @@ function exportScheduleTemplate() {
 }
 
 async function importSchedule(input) {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
   const file = input.files[0];
   if (!file) return;
   try {
@@ -2100,7 +2125,8 @@ async function importSchedule(input) {
 }
 
 // --- 节次时间 ---
-function exportPeriodsTemplate() {
+async function exportPeriodsTemplate() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
   const data = state.periods.map(p => ({
     节次编号: p.period,
     开始时间: p.start_time,
@@ -2115,6 +2141,7 @@ function exportPeriodsTemplate() {
 }
 
 async function importPeriods(input) {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
   const file = input.files[0];
   if (!file) return;
   try {
