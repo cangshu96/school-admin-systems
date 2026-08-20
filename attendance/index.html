@@ -337,6 +337,38 @@ body {
   .card { box-shadow: none; border: 1px solid #ccc; }
   body { background: #fff; }
 }
+
+/* ===== 移动端适配增强 ===== */
+html { -webkit-text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
+@media (max-width: 640px) {
+  body { font-size: 15px; }
+  .student-row { flex-wrap: wrap; padding: 12px; gap: 8px; }
+  .student-row .num { font-size: 15px; min-width: 26px; }
+  .student-row .name { font-size: 17px; min-width: 0; }
+  .student-row .gender { width: 26px; height: 26px; line-height: 26px; font-size: 13px; }
+  .status-btns { flex-basis: 100%; gap: 6px; }
+  .status-btn { padding: 9px 12px; font-size: 14px; min-height: 40px; flex: 1 1 auto; text-align: center; }
+  .role-card { padding: 18px 12px; }
+  .role-card .title { font-size: 15px; }
+  .role-card .desc { font-size: 12px; }
+  .date-nav { gap: 6px; }
+  .date-nav .nav-btn { padding: 8px 10px; font-size: 14px; }
+  .date-nav input[type="date"] { flex: 1 1 auto; min-width: 0; }
+  .header-info { font-size: 12px; }
+  .summary-table th, .summary-table td { padding: 8px 4px; }
+  .config-card { padding: 16px; }
+}
+@media (max-width: 480px) {
+  .student-row .name { font-size: 16px; }
+  .status-btn { font-size: 13px; padding: 9px 8px; }
+  .role-selector { flex-direction: column; gap: 10px; }
+  .tab-btn { font-size: 14px; padding: 12px 4px; }
+  .date-display { font-size: 15px; }
+  .summary-table { font-size: 13px; }
+  .summary-table th, .summary-table td { padding: 8px 4px; }
+}
+
 </style>
 </head>
 <body>
@@ -504,7 +536,7 @@ ON CONFLICT (id) DO NOTHING;</div>
 <div id="mainApp" class="screen screen-hidden">
   <div class="header">
     <div class="header-inner">
-      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.3.0</span></h1>
+      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.3.1</span></h1>
       <div class="header-info">
         <span class="header-date" id="headerDate"></span>
         <span class="header-role" id="headerRole"></span>
