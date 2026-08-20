@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.4</title>
+<title>巡课汇总反馈系统 v2.5.0</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -339,7 +339,7 @@ body {
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.4</div>
+    <div class="version">v2.5.0</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
     <div class="form-group">
       <label>备课组</label>
@@ -375,7 +375,7 @@ body {
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.4</span></h1>
+    <h1>📋 巡课汇总 <span class="ver">v2.5.0</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -533,6 +533,27 @@ function loadLib(name) {
     s.onerror = function(){ reject(new Error('加载' + name + '库失败，请检查网络')); };
     document.head.appendChild(s);
   });
+}
+</script>
+<script>
+// ============ 写库防抖（合并多次打分为一次保存） ============
+let __patrolSaveTimers = {};
+function schedulePatrolSave(dateStr, classId, period) {
+  const key = classId + '_' + period;
+  showSaveStatus(classId, period, 'saving');
+  if (__patrolSaveTimers[key]) clearTimeout(__patrolSaveTimers[key]);
+  __patrolSaveTimers[key] = setTimeout(async () => {
+    try {
+      const rec = state.records[key] || {};
+      await savePatrolRecord(dateStr, classId, period, rec);
+      showSaveStatus(classId, period, 'saved');
+      delete __patrolSaveTimers[key];
+    } catch (err) {
+      showSaveStatus(classId, period, 'error');
+      showToast('保存失败：' + err.message, 'error');
+      delete __patrolSaveTimers[key];
+    }
+  }, 1500);
 }
 </script>
 
@@ -998,18 +1019,7 @@ async function setScore(classId, period, item, grade) {
 
   // Re-render card
   renderPatrolCard(classId, period);
-  showSaveStatus(classId, period, 'saving');
-
-  try {
-    await savePatrolRecord(state.viewDate, classId, period, rec);
-    showSaveStatus(classId, period, 'saved');
-  } catch (err) {
-    // Revert
-    if (oldGrade === 'A') { delete rec.scores[item]; } else { rec.scores[item] = oldGrade; }
-    renderPatrolCard(classId, period);
-    showSaveStatus(classId, period, 'error');
-    showToast('保存失败：' + err.message, 'error');
-  }
+  schedulePatrolSave(state.viewDate, classId, period);
 }
 
 async function setReason(classId, period, item, reason) {
@@ -1018,13 +1028,7 @@ async function setReason(classId, period, item, reason) {
   const rec = state.records[key];
   if (reason) { rec.reasons[item] = reason; } else { delete rec.reasons[item]; }
   rec.inspector = state.teacher;
-  showSaveStatus(classId, period, 'saving');
-  try {
-    await savePatrolRecord(state.viewDate, classId, period, rec);
-    showSaveStatus(classId, period, 'saved');
-  } catch (err) {
-    showSaveStatus(classId, period, 'error');
-  }
+  schedulePatrolSave(state.viewDate, classId, period);
 }
 
 async function setSpecial(classId, period, special) {
@@ -1049,14 +1053,7 @@ async function setSpecial(classId, period, special) {
   }
   rec.inspector = state.teacher;
   renderPatrolCard(classId, period);
-  showSaveStatus(classId, period, 'saving');
-  try {
-    await savePatrolRecord(state.viewDate, classId, period, rec);
-    showSaveStatus(classId, period, 'saved');
-  } catch (err) {
-    showSaveStatus(classId, period, 'error');
-    showToast('保存失败：' + err.message, 'error');
-  }
+  schedulePatrolSave(state.viewDate, classId, period);
 }
 
 async function setRemark(classId, period, remark) {
@@ -1065,13 +1062,7 @@ async function setRemark(classId, period, remark) {
   const rec = state.records[key];
   rec.remark = remark;
   rec.inspector = state.teacher;
-  showSaveStatus(classId, period, 'saving');
-  try {
-    await savePatrolRecord(state.viewDate, classId, period, rec);
-    showSaveStatus(classId, period, 'saved');
-  } catch (err) {
-    showSaveStatus(classId, period, 'error');
-  }
+  schedulePatrolSave(state.viewDate, classId, period);
 }
 
 function renderPatrolCard(classId, period) {
@@ -1147,7 +1138,7 @@ async function onPhotoSelected(classId, period, input) {
   if (!file) return;
   showLoading('压缩图片...');
   try {
-    const compressed = await compressImage(file, 600, 0.55);
+    const compressed = await compressImage(file, 400, 0.4);
     const photoId = 'ph_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
     // Insert photo
     const { error } = await sb.from('patrol_photos').insert({
