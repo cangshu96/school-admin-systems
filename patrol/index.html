@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.5.0</title>
+<title>巡课汇总反馈系统 v2.6.0</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -339,7 +339,7 @@ body {
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.5.0</div>
+    <div class="version">v2.6.0</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
     <div class="form-group">
       <label>备课组</label>
@@ -375,7 +375,7 @@ body {
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.5.0</span></h1>
+    <h1>📋 巡课汇总 <span class="ver">v2.6.0</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -731,7 +731,7 @@ async function loadPatrolPhotos(dateStr, period) {
     data.forEach(row => {
       const key = row.class_id + '_' + row.period;
       if (!state.photos[key]) state.photos[key] = [];
-      state.photos[key].push({ id: row.id, photo_data: row.photo_data });
+      state.photos[key].push({ id: row.id, path: row.photo_path, url: row.photo_path ? getPhotoUrl(row.photo_path) : '' });
     });
   }
 }
@@ -976,7 +976,7 @@ function renderClassCard(cls, rec, subject, teacher, photos) {
   if (photos.length > 0) {
     photos.forEach((ph, idx) => {
       html += '<div style="position:relative;display:inline-block">';
-      html += '<img class="photo-thumb" src="' + ph.photo_data + '" onclick="showPhoto(\'' + ph.id + '\',\'' + cid + '\',' + period + ',' + idx + ')">';
+      html += '<img class="photo-thumb" src="' + ph.url + '" onclick="showPhoto(\'' + ph.id + '\',\'' + cid + '\',' + period + ',' + idx + ')">';
       html += '<span style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;background:var(--red);color:#fff;border-radius:50%;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1" onclick="event.stopPropagation();deletePhoto(\'' + cid + '\',' + period + ',' + idx + ')">×</span>';
       html += '</div>';
     });
@@ -1111,6 +1111,20 @@ async function resetAllToA() {
 // ============================================
 // 拍照上传
 // ============================================
+function dataURLtoBlob(dataURL) {
+  const arr = dataURL.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  const n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  for (let i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
+  return new Blob([u8arr], { type: mime });
+}
+function getPhotoUrl(path) {
+  if (!path) return '';
+  const { data } = sb.storage.from('patrol-photos').getPublicUrl(path);
+  return data.publicUrl;
+}
 async function compressImage(file, maxWidth, quality) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1140,13 +1154,19 @@ async function onPhotoSelected(classId, period, input) {
   try {
     const compressed = await compressImage(file, 400, 0.4);
     const photoId = 'ph_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
-    // Insert photo
+    // Upload compressed image to Supabase Storage
+    const blob = dataURLtoBlob(compressed);
+    const filePath = state.viewDate + '/' + classId + '_' + period + '_' + photoId + '.jpg';
+    const { error: upErr } = await sb.storage.from('patrol-photos').upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
+    if (upErr) throw upErr;
+    const photoUrl = getPhotoUrl(filePath);
+    // Insert photo record with storage path
     const { error } = await sb.from('patrol_photos').insert({
       id: photoId,
       date: state.viewDate,
       class_id: classId,
       period: period,
-      photo_data: compressed
+      photo_path: filePath
     });
     if (error) throw error;
     // Update record has_photo
@@ -1157,7 +1177,7 @@ async function onPhotoSelected(classId, period, input) {
     await savePatrolRecord(state.viewDate, classId, period, state.records[key]);
     // Update local cache
     if (!state.photos[key]) state.photos[key] = [];
-    state.photos[key].push({ id: photoId, photo_data: compressed });
+    state.photos[key].push({ id: photoId, path: filePath, url: photoUrl });
     hideLoading();
     renderPatrolCard(classId, period);
     showToast('照片已上传', 'success');
@@ -1175,6 +1195,10 @@ async function deletePhoto(classId, period, photoIdx) {
   const ph = photos[photoIdx];
   if (!ph) return;
   try {
+    // Remove storage object if path exists
+    if (ph.path) {
+      await sb.storage.from('patrol-photos').remove([ph.path]);
+    }
     const { error } = await sb.from('patrol_photos').delete().eq('id', ph.id);
     if (error) throw error;
     state.photos[key].splice(photoIdx, 1);
@@ -1195,7 +1219,7 @@ function showPhotoByIdx(classId, period, idx) {
   const photos = state.photos[key] || [];
   const ph = photos[idx];
   if (!ph) return;
-  document.getElementById('photoModalImg').src = ph.photo_data;
+  document.getElementById('photoModalImg').src = ph.url;
   document.getElementById('photoModal').classList.remove('screen-hidden');
 }
 
@@ -1204,7 +1228,7 @@ function showPhoto(photoId, classId, period, idx) {
   const photos = state.photos[key] || [];
   const ph = photos[idx];
   if (!ph) return;
-  document.getElementById('photoModalImg').src = ph.photo_data;
+  document.getElementById('photoModalImg').src = ph.url;
   document.getElementById('photoModal').classList.remove('screen-hidden');
 }
 function closePhotoModal(e) {
@@ -1332,7 +1356,7 @@ async function showCellDetail(classId, period) {
     html += '<div style="font-size:13px;margin-bottom:6px;font-weight:500">📸 照片(' + photos.length + ')</div>';
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
     photos.forEach((ph, idx) => {
-      html += '<img class="photo-thumb" src="' + ph.photo_data + '" onclick="showPhoto(\'\',\'\'' + classId + '\',' + period + ',' + idx + ')" style="width:80px;height:80px">';
+      html += '<img class="photo-thumb" src="' + ph.url + '" onclick="showPhoto(\'\',\'\'' + classId + '\',' + period + ',' + idx + ')" style="width:80px;height:80px">';
     });
     html += '</div>';
   }
@@ -1629,6 +1653,12 @@ async function deleteClass(id) {
     await sb.from('patrol_classes').delete().eq('id', id);
     await sb.from('patrol_schedule').delete().eq('class_id', id);
     await sb.from('patrol_records').delete().eq('class_id', id);
+    // Remove associated photos from storage
+    const { data: phRows } = await sb.from('patrol_photos').select('photo_path').eq('class_id', id);
+    if (phRows && phRows.length > 0) {
+      const paths = phRows.map(r => r.photo_path).filter(Boolean);
+      if (paths.length > 0) await sb.storage.from('patrol-photos').remove(paths);
+    }
     await sb.from('patrol_photos').delete().eq('class_id', id);
     await loadClasses();
     await loadSchedule();
