@@ -1,11 +1,20 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<link rel="preconnect" href="https://cdn.bootcdn.net" crossorigin>
+<link rel="preconnect" href="https://cangshu96.github.io" crossorigin>
+<link rel="preconnect" href="https://vigzdhhrqjmbtwewgcrz.supabase.co" crossorigin>
+<style>
+#app-loading{position:fixed;top:0;left:0;width:100%;height:100%;background:#f0f2f5;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;transition:opacity .3s}
+#app-loading .spinner{width:40px;height:40px;border:3px solid #e0e0e0;border-top-color:#1677ff;border-radius:50%;animation:spin .8s linear infinite}
+#app-loading .text{margin-top:16px;color:#8c8c8c;font-size:15px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>级部考勤系统 - 云端版</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
   --primary: #1677ff; --primary-light: #e6f0ff; --primary-dark: #0958d9;
@@ -293,6 +302,7 @@ body {
 </style>
 </head>
 <body>
+<div id="app-loading"><div class="spinner"></div><div class="text">正在加载系统...</div></div>
 
 <!-- ========== Config Screen ========== -->
 <div id="configScreen" class="screen">
@@ -2224,5 +2234,6 @@ async function init() {
 
 init();
 </script>
+<script>window.addEventListener('load',function(){var el=document.getElementById('app-loading');if(el){el.style.opacity='0';setTimeout(function(){el.remove()},300)}});</script>
 </body>
 </html>
