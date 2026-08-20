@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
+<link rel="preconnect" href="https://cdn.bootcdn.net" crossorigin>
+<link rel="preconnect" href="https://cangshu96.github.io" crossorigin>
+<link rel="preconnect" href="https://vigzdhhrqjmbtwewgcrz.supabase.co" crossorigin>
+<style>
+#app-loading{position:fixed;top:0;left:0;width:100%;height:100%;background:#f0f2f5;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;transition:opacity .3s}
+#app-loading .spinner{width:40px;height:40px;border:3px solid #e0e0e0;border-top-color:#1677ff;border-radius:50%;animation:spin .8s linear infinite}
+#app-loading .text{margin-top:16px;color:#8c8c8c;font-size:15px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>巡课汇总反馈系统 v2.4</title>
@@ -317,6 +326,7 @@ body {
 </style>
 </head>
 <body>
+<div id="app-loading"><div class="spinner"></div><div class="text">正在加载系统...</div></div>
 
 <div id="loadingOverlay" class="screen-hidden">
   <div class="spinner"></div>
@@ -505,9 +515,9 @@ body {
   <img id="photoModalImg" src="">
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ============================================
 // 配置
@@ -1457,7 +1467,8 @@ function exportFeedbackWord() {
   html += '<div class="section"><h2>巡堂总结</h2><p style="white-space:pre-wrap">' + (document.getElementById('summaryText').value || '暂无') + '</p></div>';
   html += '<div style="text-align:right;margin-top:24pt">巡课人：' + (state.teacher || '') + '</div>';
   html += '<div style="text-align:right;color:#999;font-size:11pt">生成时间：' + new Date().toLocaleString() + '</div>';
-  html += '</body></html>';
+  html += '<script>window.addEventListener('load',function(){var el=document.getElementById('app-loading');if(el){el.style.opacity='0';setTimeout(function(){el.remove()},300)}});</script>
+</body></html>';
   
   const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
   const a = document.createElement('a');
