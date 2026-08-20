@@ -1,0 +1,2228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>级部考勤系统 - 云端版</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+:root {
+  --primary: #1677ff; --primary-light: #e6f0ff; --primary-dark: #0958d9;
+  --bg: #f0f2f5; --card-bg: #fff; --text: #1f1f1f; --text2: #8c8c8c;
+  --border: #e8e8e8; --shadow: 0 2px 8px rgba(0,0,0,0.06); --radius: 10px;
+  --green: #52c41a; --green-bg: #f6ffed; --orange: #fa8c16; --orange-bg: #fff7e6;
+  --yellow: #d4b106; --yellow-bg: #fffbe6; --red: #f5222d; --red-bg: #fff1f0;
+  --gray: #8c8c8c; --gray-bg: #fafafa;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased;
+}
+
+/* ===== Screens ===== */
+.screen { min-height: 100vh; }
+.screen-hidden { display: none !important; }
+
+/* ===== Config Screen ===== */
+.config-wrap { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+.config-logo { text-align: center; padding: 32px 0 24px; }
+.config-logo h1 { font-size: 26px; color: var(--primary); margin-bottom: 6px; }
+.config-logo p { color: var(--text2); font-size: 15px; }
+.config-card {
+  background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 24px; margin-bottom: 16px;
+}
+.config-card h2 { font-size: 17px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.config-step { display: flex; gap: 12px; margin-bottom: 16px; }
+.config-step .num {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--primary);
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; flex-shrink: 0;
+}
+.config-step .body { flex: 1; font-size: 14px; line-height: 1.7; color: var(--text); }
+.config-step .body b { color: var(--primary-dark); }
+.config-step .body a { color: var(--primary); text-decoration: none; }
+.config-step .body a:hover { text-decoration: underline; }
+.config-input-group { margin-bottom: 14px; }
+.config-input-group label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.config-input-group input {
+  width: 100%; padding: 10px 14px; border: 1.5px solid var(--border);
+  border-radius: 8px; font-size: 14px; font-family: monospace; outline: none;
+  transition: border-color 0.2s;
+}
+.config-input-group input:focus { border-color: var(--primary); }
+.sql-block {
+  background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px;
+  font-size: 12px; font-family: "Fira Code", monospace; line-height: 1.6;
+  overflow-x: auto; max-height: 320px; white-space: pre; position: relative;
+}
+.sql-block .copy-btn {
+  position: absolute; top: 8px; right: 8px; padding: 4px 12px; font-size: 12px;
+  background: #333; color: #fff; border: none; border-radius: 4px; cursor: pointer;
+  font-family: inherit;
+}
+.sql-block .copy-btn:hover { background: #555; }
+
+/* ===== Login Screen ===== */
+.login-wrap { max-width: 480px; margin: 0 auto; padding: 48px 16px; text-align: center; }
+.login-wrap h1 { font-size: 24px; color: var(--primary); margin-bottom: 8px; }
+.login-wrap .subtitle { color: var(--text2); font-size: 15px; margin-bottom: 32px; }
+.role-selector { display: flex; gap: 12px; margin-bottom: 24px; }
+.role-card {
+  flex: 1; padding: 24px 16px; border: 2px solid var(--border); border-radius: 12px;
+  background: #fff; cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.role-card:hover { border-color: var(--primary); }
+.role-card.selected { border-color: var(--primary); background: var(--primary-light); }
+.role-card .icon { font-size: 32px; margin-bottom: 8px; }
+.role-card .title { font-size: 16px; font-weight: 600; }
+.role-card .desc { font-size: 13px; color: var(--text2); margin-top: 4px; }
+.class-dropdown-wrap { margin-bottom: 20px; text-align: left; }
+.class-dropdown-wrap label { font-size: 14px; font-weight: 600; display: block; margin-bottom: 6px; }
+.class-dropdown-wrap select {
+  width: 100%; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 16px; font-family: inherit; outline: none; background: #fff;
+}
+.class-dropdown-wrap select:focus { border-color: var(--primary); }
+
+/* ===== Buttons ===== */
+.btn {
+  padding: 10px 24px; border: none; border-radius: 8px; font-size: 15px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s; font-family: inherit; display: inline-flex;
+  align-items: center; gap: 6px; justify-content: center;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-outline { background: #fff; border: 1.5px solid var(--border); color: var(--text); }
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.btn-danger { background: #fff; border: 1.5px solid var(--red); color: var(--red); }
+.btn-danger:hover { background: var(--red-bg); }
+.btn-success { background: var(--green); color: #fff; }
+.btn-block { width: 100%; }
+.btn-sm { padding: 6px 14px; font-size: 13px; }
+
+/* ===== Header ===== */
+.header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: #fff; padding: 14px 20px; position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 8px rgba(22,119,255,0.3);
+}
+.header-inner {
+  max-width: 1200px; margin: 0 auto; display: flex; align-items: center;
+  justify-content: space-between; flex-wrap: wrap; gap: 10px;
+}
+.header h1 { font-size: 20px; font-weight: 700; }
+.header-info { display: flex; align-items: center; gap: 12px; font-size: 14px; }
+.header-date { opacity: 0.95; }
+.header-role {
+  background: rgba(255,255,255,0.2); padding: 3px 12px; border-radius: 16px; font-size: 12px;
+}
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.header-btn {
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+  color: #fff; padding: 5px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  font-family: inherit; transition: background 0.2s;
+}
+.header-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* ===== Tabs ===== */
+.tabs { background: #fff; display: flex; border-bottom: 1px solid var(--border); position: sticky; top: 54px; z-index: 99; }
+.tab-btn {
+  flex: 1; padding: 13px 16px; border: none; background: none; font-size: 15px; font-weight: 500;
+  color: var(--text2); cursor: pointer; transition: all 0.2s; border-bottom: 3px solid transparent;
+  font-family: inherit;
+}
+.tab-btn:hover { color: var(--primary); }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+/* ===== Container ===== */
+.container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ===== Card ===== */
+.card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; margin-bottom: 14px; }
+.card-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+/* ===== Class Selector ===== */
+.class-selector { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.class-btn {
+  padding: 8px 20px; border: 2px solid var(--border); border-radius: 8px; background: #fff;
+  font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: inherit;
+}
+.class-btn:hover { border-color: var(--primary); color: var(--primary); }
+.class-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* ===== Status Bar ===== */
+.status-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; padding: 10px 14px; background: #f8f9fa; border-radius: 8px; }
+.status-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 500; }
+.status-chip .dot { width: 10px; height: 10px; border-radius: 50%; }
+.status-chip .count { font-size: 17px; font-weight: 700; }
+
+/* ===== Student List ===== */
+.student-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 10px; }
+.student-row {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #fff;
+  border: 1px solid var(--border); border-radius: 10px; transition: all 0.15s;
+}
+.student-row:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.student-row .num { font-size: 16px; color: var(--text2); min-width: 30px; text-align: center; font-weight: 600; }
+.student-row .class-col { font-size: 15px; color: var(--primary); min-width: 42px; font-weight: 600; }
+.student-row .name { font-size: 18px; font-weight: 600; min-width: 60px; }
+.student-row .gender {
+  font-size: 14px; min-width: 20px; text-align: center; font-weight: 700;
+  width: 28px; height: 28px; line-height: 28px; border-radius: 50%; flex-shrink: 0;
+}
+.student-row .gender.male { color: #fff; background: #4096ff; }
+.student-row .gender.female { color: #fff; background: #eb2f96; }
+.status-btns { display: flex; gap: 5px; flex: 1; flex-wrap: wrap; }
+.status-btn {
+  padding: 6px 12px; border: 1.5px solid var(--border); border-radius: 6px; background: #fff;
+  font-size: 14px; cursor: pointer; transition: all 0.15s; font-family: inherit; color: var(--text2);
+}
+.status-btn:hover { opacity: 0.8; }
+.status-btn.active { color: #fff; border-color: transparent; font-weight: 600; }
+.status-btn[data-s="到"].active { background: var(--green); }
+.status-btn[data-s="长期居家"].active { background: var(--gray); }
+.status-btn[data-s="病假"].active { background: var(--orange); }
+.status-btn[data-s="事假"].active { background: var(--yellow); }
+.status-btn[data-s="迟到"].active { background: var(--red); }
+.status-btn[data-s="上午请假离校"].active { background: #08979c; }
+.status-btn[data-s="下午请假离校"].active { background: #722ed1; }
+
+/* ===== Date Nav ===== */
+.date-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.date-nav .date-display { font-size: 16px; font-weight: 600; padding: 5px 14px; background: var(--primary-light); border-radius: 8px; }
+.date-nav .nav-btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; font-family: inherit; color: var(--text); }
+.date-nav .nav-btn:hover { border-color: var(--primary); color: var(--primary); }
+.date-nav .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.today-badge { background: var(--green); color: #fff; padding: 3px 10px; border-radius: 14px; font-size: 12px; font-weight: 600; }
+
+/* ===== Summary Table ===== */
+.summary-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.summary-table th { background: var(--primary-light); color: var(--primary-dark); padding: 10px 6px; text-align: center; font-weight: 600; border: 1px solid #d6e4ff; white-space: nowrap; }
+.summary-table td { padding: 9px 6px; text-align: center; border: 1px solid var(--border); }
+.summary-table tr:hover td { background: #fafafa; }
+.summary-table .total-row td { font-weight: 700; background: var(--primary-light); color: var(--primary-dark); font-size: 15px; }
+
+/* ===== Settings ===== */
+.class-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+.class-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.class-card-header input { font-size: 15px; font-weight: 600; border: none; border-bottom: 2px solid var(--primary); padding: 3px 6px; outline: none; width: 100px; font-family: inherit; background: var(--primary-light); border-radius: 4px 4px 0 0; }
+.student-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.student-tag { display: inline-flex; align-items: center; gap: 5px; background: var(--primary-light); color: var(--primary-dark); padding: 3px 8px; border-radius: 14px; font-size: 13px; }
+.student-tag .remove { cursor: pointer; opacity: 0.6; font-size: 15px; line-height: 1; }
+.student-tag .remove:hover { opacity: 1; color: var(--red); }
+.add-student-input { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; width: 110px; font-family: inherit; outline: none; }
+.add-student-input:focus { border-color: var(--primary); }
+
+/* ===== Notice ===== */
+.notice { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 10px 14px; border-radius: 0 8px 8px 0; margin-bottom: 14px; font-size: 13px; color: var(--primary-dark); line-height: 1.6; }
+
+/* ===== Save Status ===== */
+.save-indicator { font-size: 13px; display: flex; align-items: center; gap: 4px; }
+.save-indicator.saving { color: var(--text2); }
+.save-indicator.saved { color: var(--green); }
+.save-indicator.error { color: var(--red); }
+
+/* ===== Loading & Toast ===== */
+.loading-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999;
+}
+.spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.loading-overlay .text { margin-top: 12px; font-size: 15px; color: var(--text2); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 12px 24px;
+  border-radius: 8px; font-size: 14px; color: #fff; z-index: 10000; opacity: 0;
+  transition: opacity 0.3s; pointer-events: none; max-width: 90%; text-align: center;
+}
+.toast.show { opacity: 1; }
+.toast.success { background: var(--green); }
+.toast.error { background: var(--red); }
+.toast.info { background: var(--primary); }
+
+/* ===== Empty State ===== */
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text2); }
+.empty-state .icon { font-size: 48px; margin-bottom: 8px; }
+.empty-state .text { font-size: 16px; }
+.empty-state .hint { font-size: 13px; margin-top: 4px; }
+
+/* ===== Responsive ===== */
+@media (max-width: 640px) {
+  .header h1 { font-size: 17px; }
+  .header-info { font-size: 12px; gap: 8px; }
+  .student-list { grid-template-columns: 1fr; }
+  .tab-btn { padding: 11px 6px; font-size: 13px; }
+  .summary-table { font-size: 12px; }
+  .summary-table th, .summary-table td { padding: 6px 3px; }
+  .config-card { padding: 16px; }
+}
+
+/* ===== Stats Tab ===== */
+.stats-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+.stats-controls select, .stats-controls input { padding:6px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; font-family:inherit; outline:none; background:#fff; }
+.stats-controls select:focus, .stats-controls input:focus { border-color:var(--primary); }
+.chart-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:14px; margin-bottom:16px; }
+.chart-box { background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.06); padding:16px; }
+.chart-box canvas { max-height:300px; }
+.chart-box.full { grid-column:1/-1; }
+.chart-box canvas.tall { max-height:380px; }
+.alert-card { border-left:4px solid var(--red); background:#fff1f0; border-radius:0 8px 8px 0; padding:12px 16px; margin-bottom:8px; }
+.alert-card.warn { border-left-color:var(--orange); background:#fff7e6; }
+.alert-card .student-name { font-weight:700; font-size:15px; }
+.alert-card .alert-detail { font-size:13px; color:var(--text2); margin-top:4px; line-height:1.6; }
+.alert-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600; margin-right:4px; color:#fff; }
+.stats-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:16px; }
+.stat-card { background:#fff; border-radius:8px; padding:14px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.05); border:1px solid var(--border); }
+.stat-card .num { font-size:28px; font-weight:700; }
+.stat-card .label { font-size:13px; color:var(--text2); margin-top:4px; }
+
+/* ===== Print ===== */
+@media print {
+  .header, .tabs, .date-nav .nav-btn, .header-actions { display: none !important; }
+  .container { padding: 0; }
+  .card { box-shadow: none; border: 1px solid #ccc; }
+  body { background: #fff; }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== Config Screen ========== -->
+<div id="configScreen" class="screen">
+  <div class="config-wrap">
+    <div class="config-logo">
+      <h1>📋 级部考勤系统</h1>
+      <p>云端版 · 多人协作 · 实时汇总</p>
+    </div>
+
+    <div class="config-card">
+      <h2>🚀 首次配置（仅教务处需要操作一次）</h2>
+
+      <div class="config-step">
+        <div class="num">1</div>
+        <div class="body">
+          注册 <b>Supabase</b> 免费账号：<br>
+          打开 <a href="https://supabase.com" target="_blank">supabase.com</a> → 点击 Start your project → 用 GitHub 或邮箱注册
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div class="num">2</div>
+        <div class="body">
+          点击 <b>New Project</b>，填写项目名称（如 school-attendance），选择区域 East Asia (Singapore)，设置数据库密码（记住它），点击 Create
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div class="num">3</div>
+        <div class="body">
+          等待项目创建完成（约1-2分钟），然后点击左侧 <b>SQL Editor</b> → New query<br>
+          将下方 SQL 脚本复制粘贴进去，点击 <b>Run</b> 执行
+          <div class="sql-block" style="margin-top:8px" id="sqlBlock"><button class="copy-btn" onclick="copySQL()">复制</button>-- 级部考勤系统数据库初始化
+
+-- 1. 班级表
+CREATE TABLE IF NOT EXISTS classes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  students JSONB DEFAULT '[]'::jsonb,
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. 考勤表（每天每班一条记录）
+CREATE TABLE IF NOT EXISTS attendance (
+  date DATE NOT NULL,
+  class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  records JSONB DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (date, class_id)
+);
+
+-- 3. 启用行级安全
+ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
+
+-- 4. 允许读写
+CREATE POLICY "classes_all" ON classes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "attendance_all" ON attendance FOR ALL USING (true) WITH CHECK (true);
+
+-- 5. 自动更新时间触发器
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_classes_updated BEFORE UPDATE ON classes
+  FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+CREATE TRIGGER trigger_attendance_updated BEFORE UPDATE ON attendance
+  FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+-- 6. 示例班级
+INSERT INTO classes (id, name, students, sort_order) VALUES
+  ('c1','1班','[]',0), ('c2','2班','[]',1), ('c3','3班','[]',2)
+ON CONFLICT (id) DO NOTHING;</div>
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div class="num">4</div>
+        <div class="body">
+          点击左侧 <b>Project Settings</b>（齿轮图标）→ <b>API</b><br>
+          找到以下两项并复制：
+          <ul style="margin:6px 0 0 20px; line-height:1.8">
+            <li><b>Project URL</b> — 形如 https://xxxx.supabase.co</li>
+            <li><b>anon public key</b> — 一长串 eyJ 开头的字符串</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="config-step">
+        <div class="num">5</div>
+        <div class="body" style="flex:1">
+          将上面复制的值填入下方：
+          <div class="config-input-group" style="margin-top:10px">
+            <label>Project URL</label>
+            <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off">
+          </div>
+          <div class="config-input-group">
+            <label>anon public key</label>
+            <input type="text" id="sbKey" placeholder="eyJhbGciOi..." autocomplete="off">
+          </div>
+          <button class="btn btn-primary btn-block" onclick="testAndSaveConfig()" style="margin-top:8px">
+            🔗 测试连接并保存
+          </button>
+          <div id="configStatus" style="margin-top:8px; font-size:13px; text-align:center"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="config-card">
+      <h2>📱 分发给班主任</h2>
+      <div style="font-size:14px; line-height:1.8; color:var(--text)">
+        <p style="margin-bottom:8px">配置成功后，将本 HTML 文件发送给各班主任：</p>
+        <ul style="margin-left:20px; line-height:2">
+          <li>通过微信/QQ发送文件给各班主任</li>
+          <li>班主任在手机或电脑浏览器中打开</li>
+          <li>选择自己的班级即可开始考勤登记</li>
+          <li>所有数据自动同步到云端，教务处实时可见</li>
+        </ul>
+        <p style="margin-top:10px; color:var(--text2); font-size:13px">
+          💡 提示：配置信息保存在浏览器本地，每个设备只需配置一次。
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Login Screen ========== -->
+<div id="loginScreen" class="screen screen-hidden">
+  <div class="login-wrap">
+    <h1>📋 级部考勤系统</h1>
+    <p class="subtitle">请选择身份进入</p>
+    <div class="role-selector">
+      <div class="role-card selected" id="roleTeacher" onclick="selectRole('teacher')">
+        <div class="icon">👩‍🏫</div>
+        <div class="title">班主任</div>
+        <div class="desc">登记本班考勤</div>
+      </div>
+      <div class="role-card" id="roleAdmin" onclick="selectRole('admin')">
+        <div class="icon">🏢</div>
+        <div class="title">教务处</div>
+        <div class="desc">查看级部汇总</div>
+      </div>
+    </div>
+    <div class="class-dropdown-wrap" id="classSelectWrap">
+      <label>选择班级</label>
+      <select id="loginClassSelect"></select>
+    </div>
+    <div class="class-dropdown-wrap" id="adminPasswordWrap" style="display:none">
+      <label>教务处密码</label>
+      <input type="password" id="adminPassword" placeholder="请输入教务处密码" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doLogin()" style="font-size:16px; padding:14px">
+      进 入 系 统
+    </button>
+  </div>
+</div>
+
+<!-- ========== Main App ========== -->
+<div id="mainApp" class="screen screen-hidden">
+  <div class="header">
+    <div class="header-inner">
+      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.2.0</span></h1>
+      <div class="header-info">
+        <span class="header-date" id="headerDate"></span>
+        <span class="header-role" id="headerRole"></span>
+      </div>
+      <div class="header-actions">
+        <button class="header-btn" onclick="refreshData()">🔄 刷新</button>
+        <button class="header-btn" onclick="switchRole()">切换身份</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabsBar">
+    <button class="tab-btn active" onclick="switchTab('attendance')">考勤登记</button>
+    <button class="tab-btn" onclick="switchTab('summary')">级部汇总</button>
+    <button class="tab-btn" onclick="switchTab('settings')">班级设置</button>
+    <button class="tab-btn" onclick="switchTab('stats')" id="statsTabBtn" style="display:none">统计分析</button>
+  </div>
+
+  <div class="container">
+    <!-- Attendance Tab -->
+    <div class="tab-content active" id="tab-attendance">
+      <div class="notice">
+        💡 默认所有学生为「到」。可在「班级设置」中为长期居家等学生设定默认状态。只需点击需要标记的学生选择状态即可，<b>点击即时保存到云端</b>。
+      </div>
+      <div class="date-nav">
+        <button class="nav-btn" onclick="changeDate(-1)">‹ 前一天</button>
+        <span class="date-display" id="viewDate"></span>
+        <button class="nav-btn" id="nextDayBtn" onclick="changeDate(1)">后一天 ›</button>
+        <span class="today-badge" id="todayBadge" style="display:none">今天</span>
+        <input type="date" id="datePicker" class="nav-btn" style="font-family:inherit;color:var(--text)" onchange="jumpToDate(this.value)">
+        <span class="save-indicator" id="saveIndicator"></span>
+      </div>
+      <div class="card" id="classSelectorCard">
+        <div class="card-title">🏫 选择班级</div>
+        <div class="class-selector" id="classSelector"></div>
+      </div>
+      <div class="status-bar" id="statusBar"></div>
+      <div class="card">
+        <div class="card-title">
+          <span>📝 学生考勤</span>
+          <span style="font-size:13px;color:var(--text2);font-weight:400" id="classNameLabel"></span>
+        </div>
+        <div id="quickActions" style="display:none; margin-bottom:12px">
+          <button class="btn btn-outline btn-sm" onclick="resetAllToPresent()">✓ 全部标记为「到」</button>
+        </div>
+        <div class="student-list" id="studentList">
+          <div class="empty-state"><div class="text">加载中...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Tab -->
+    <div class="tab-content" id="tab-summary">
+      <div class="card">
+        <div class="card-title">📊 级部考勤汇总</div>
+        <div class="date-nav">
+          <button class="nav-btn" onclick="changeDate(-1)">‹ 前一天</button>
+          <span class="date-display" id="viewDateSum"></span>
+          <button class="nav-btn" id="nextDaySumBtn" onclick="changeDate(1)">后一天 ›</button>
+          <span class="today-badge" id="todayBadgeSum" style="display:none">今天</span>
+          <input type="date" id="datePickerSum" class="nav-btn" style="font-family:inherit;color:var(--text)" onchange="jumpToDate(this.value)">
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="exportSummary('day')">📥 导出本日</button>
+          <button class="btn btn-primary btn-sm" onclick="exportSummary('week')">📥 导出本周</button>
+          <button class="btn btn-primary btn-sm" onclick="exportSummary('month')">📥 导出本月</button>
+          <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ 打印</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="summary-table" id="summaryTable"></table>
+        </div>
+        <div id="summaryDetail" style="margin-top:16px"></div>
+      </div>
+    </div>
+
+    <!-- Stats Tab -->
+    <div class="tab-content" id="tab-stats">
+      <div class="card">
+        <div class="card-title">📈 考勤统计分析</div>
+        <div class="stats-controls">
+          <label>统计范围：</label>
+          <select id="statsRange" onchange="onStatsRangeChange()">
+            <option value="month">本月</option>
+            <option value="semester">本学期</option>
+            <option value="custom">自定义</option>
+          </select>
+          <input type="date" id="statsStart" style="display:none" onchange="renderStats()">
+          <input type="date" id="statsEnd" style="display:none" onchange="renderStats()">
+          <button class="btn btn-primary btn-sm" onclick="renderStats()">🔄 刷新统计</button>
+          <button class="btn btn-outline btn-sm" onclick="exportStats()">📥 导出统计</button>
+        </div>
+        <div id="statsSummary" class="stats-summary"></div>
+        <div id="statsCharts" class="chart-grid"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">⚠️ 重点关注学生</div>
+        <div id="statsAlerts"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📋 各班出勤明细</div>
+        <div id="statsClassDetail"></div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div class="tab-content" id="tab-settings">
+      <div class="card">
+        <div class="card-title">⚙️ 班级与学生管理 <span style="font-size:13px;color:var(--text2);font-weight:400">（仅教务处可操作）</span></div>
+        <div class="notice">💡 在这里添加/修改班级和学生名单。修改后所有班主任端同步更新。</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px">
+          <button class="btn btn-primary btn-sm" onclick="addClass()">+ 添加班级</button>
+        </div>
+      </div>
+      <div id="settingsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading" class="loading-overlay" style="display:none">
+  <div class="spinner"></div>
+  <div class="text" id="loadingText">加载中...</div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+// ============================================
+// Constants & State
+// ============================================
+const STATUS_LIST = ['到', '长期居家', '病假', '事假', '迟到', '上午请假离校', '下午请假离校'];
+const STATUS_COLORS = {
+  '到': 'var(--green)', '长期居家': 'var(--gray)', '病假': 'var(--orange)',
+  '事假': 'var(--yellow)', '迟到': 'var(--red)',
+  '上午请假离校': '#08979c', '下午请假离校': '#722ed1'
+};
+const STATUS_BG = {
+  '到': 'var(--green-bg)', '长期居家': 'var(--gray-bg)', '病假': 'var(--orange-bg)',
+  '事假': 'var(--yellow-bg)', '迟到': 'var(--red-bg)',
+  '上午请假离校': '#e6fffb', '下午请假离校': '#f9f0ff'
+};
+const CONFIG_KEY = 'gradeAtt_cloud_config';
+const LAST_ROLE_KEY = 'gradeAtt_last_role';
+const LAST_CLASS_KEY = 'gradeAtt_last_class';
+
+let sb = null;           // Supabase client
+let state = {
+  classes: [],            // [{ id, name, students, sort_order }]
+  role: null,             // 'teacher' | 'admin'
+  currentClassId: null,
+  viewDate: todayStr(),
+  attendanceCache: {}    // { classId: { studentName: status } }
+};
+let selectedRole = 'teacher';
+
+// ============================================
+// Utilities
+// ============================================
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function formatDateCN(s) {
+  const [y,m,d] = s.split('-');
+  return `${y}年${parseInt(m)}月${parseInt(d)}日`;
+}
+function getDayOfWeek(s) {
+  const days = ['周日','周一','周二','周三','周四','周五','周六'];
+  return days[new Date(s + 'T00:00:00').getDay()];
+}
+function dateOffset(s, n) {
+  const d = new Date(s + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function showLoading(text = '加载中...') {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loading').style.display = '';
+}
+function hideLoading() { document.getElementById('loading').style.display = 'none'; }
+function showToast(msg, type = 'info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+function showSaveStatus(state) {
+  const el = document.getElementById('saveIndicator');
+  if (!el) return;
+  if (state === 'saving') { el.className = 'save-indicator saving'; el.textContent = '⏳ 保存中...'; }
+  else if (state === 'saved') { el.className = 'save-indicator saved'; el.textContent = '✓ 已保存'; setTimeout(() => { el.textContent = ''; }, 2000); }
+  else if (state === 'error') { el.className = 'save-indicator error'; el.textContent = '✗ 保存失败'; }
+}
+
+// ============================================
+// Config Management
+// ============================================
+// 预置凭据 — 已配置好，班主任打开即可使用
+const EMBEDDED_CONFIG = {
+  url: 'https://vigzdhhrqjmbtwewgcrz.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ3pkaGhycWptYnR3ZXdnY3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDI2NjksImV4cCI6MjEwMjcxODY2OX0.JNw_f2j776kVcVBLbtmScXMs_KU5ZOeyockBIFbT8oU'
+};
+
+function loadConfig() {
+  // 优先使用用户手动覆盖的配置，其次使用预置凭据
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved.url && saved.key) return saved;
+    }
+  } catch {}
+  return EMBEDDED_CONFIG;
+}
+function saveConfig(url, key) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify({ url, key }));
+}
+function copySQL() {
+  const text = document.getElementById('sqlBlock').textContent.replace('复制', '').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('SQL 已复制到剪贴板', 'success');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    showToast('SQL 已复制', 'success');
+  });
+}
+
+async function testAndSaveConfig() {
+  const url = document.getElementById('sbUrl').value.trim();
+  const key = document.getElementById('sbKey').value.trim();
+  const statusEl = document.getElementById('configStatus');
+
+  if (!url || !key) {
+    statusEl.innerHTML = '<span style="color:var(--red)">请填写完整的 URL 和 Key</span>';
+    return;
+  }
+
+  showLoading('测试连接中...');
+  statusEl.innerHTML = '<span style="color:var(--text2)">⏳ 测试中...</span>';
+
+  try {
+    if (typeof supabase === 'undefined') {
+      throw new Error('Supabase 库加载失败，请检查网络连接');
+    }
+    const client = supabase.createClient(url, key);
+    // Test by querying classes table
+    const { data, error } = await client.from('classes').select('id').limit(1);
+    if (error) {
+      if (error.message.includes('does not exist') || error.message.includes('relation')) {
+        throw new Error('数据库表未创建，请先执行 SQL 脚本（上方第3步）');
+      }
+      throw error;
+    }
+    // Success
+    saveConfig(url, key);
+    sb = client;
+    hideLoading();
+    statusEl.innerHTML = '<span style="color:var(--green)">✓ 连接成功！</span>';
+    showToast('连接成功！', 'success');
+    await loadData();
+    showLoginScreen();
+  } catch (err) {
+    hideLoading();
+    statusEl.innerHTML = '<span style="color:var(--red)">✗ ' + err.message + '</span>';
+  }
+}
+
+// ============================================
+// Supabase Data Operations
+// ============================================
+async function loadClasses() {
+  const { data, error } = await sb.from('classes').select('*').order('sort_order', { ascending: true });
+  if (error) throw error;
+  state.classes = (data || []).map(cls => ({
+    ...cls,
+    students: (cls.students || []).map(s =>
+      typeof s === 'string' ? { seq: 0, name: s, gender: '' } : s
+    )
+  }));
+}
+
+async function loadAttendance(dateStr, classId) {
+  const { data, error } = await sb.from('attendance')
+    .select('records')
+    .eq('date', dateStr)
+    .eq('class_id', classId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data && data.records) || {};
+}
+
+async function loadAllAttendance(dateStr) {
+  const { data, error } = await sb.from('attendance')
+    .select('class_id, records')
+    .eq('date', dateStr);
+  if (error) throw error;
+  const result = {};
+  if (data) {
+    data.forEach(row => { result[row.class_id] = row.records || {}; });
+  }
+  return result;
+}
+
+async function saveAttendanceRecords(dateStr, classId, records) {
+  const { error } = await sb.from('attendance')
+    .upsert({
+      date: dateStr,
+      class_id: classId,
+      records: records,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'date,class_id' });
+  if (error) throw error;
+}
+
+async function applyDefaultStatus(classId, dateStr) {
+  // If today's record already exists, do nothing
+  const existing = await loadAttendance(dateStr, classId);
+  if (Object.keys(existing).length > 0) return;
+
+  const cls = state.classes.find(c => c.id === classId);
+  if (!cls) return;
+
+  // 1) Apply each student's defaultStatus from profile
+  const defaults = {};
+  cls.students.forEach(s => {
+    if (s.defaultStatus && s.defaultStatus !== '到') {
+      defaults[s.name] = s.defaultStatus;
+    }
+  });
+
+  // 2) Also carry over 长期居家 from most recent previous record (backward compatibility)
+  const { data, error } = await sb.from('attendance')
+    .select('date, records')
+    .eq('class_id', classId)
+    .lt('date', dateStr)
+    .order('date', { ascending: false })
+    .limit(1);
+  if (!error && data && data.length > 0) {
+    const prevRecords = data[0].records || {};
+    for (const [name, status] of Object.entries(prevRecords)) {
+      if (status === '长期居家' && !defaults[name]) {
+        defaults[name] = '长期居家';
+      }
+    }
+  }
+
+  if (Object.keys(defaults).length > 0) {
+    await saveAttendanceRecords(dateStr, classId, defaults);
+  }
+}
+
+// ============================================
+// Data Loading
+// ============================================
+async function loadData() {
+  showLoading('加载数据...');
+  try {
+    await loadClasses();
+    hideLoading();
+  } catch (err) {
+    hideLoading();
+    showToast('数据加载失败：' + err.message, 'error');
+  }
+}
+
+// ============================================
+// Login
+// ============================================
+function showLoginScreen() {
+  document.getElementById('configScreen').classList.add('screen-hidden');
+  document.getElementById('mainApp').classList.add('screen-hidden');
+  document.getElementById('loginScreen').classList.remove('screen-hidden');
+  // Populate class dropdown
+  const sel = document.getElementById('loginClassSelect');
+  if (state.classes.length === 0) {
+    sel.innerHTML = '<option value="">暂无班级，请先在设置中添加</option>';
+  } else {
+    sel.innerHTML = state.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    // Restore last selection
+    const lastClass = localStorage.getItem(LAST_CLASS_KEY);
+    if (lastClass && state.classes.find(c => c.id === lastClass)) {
+      sel.value = lastClass;
+    }
+  }
+}
+
+const ADMIN_PASSWORD = 'EQjwc';
+
+function selectRole(role) {
+  selectedRole = role;
+  document.getElementById('roleTeacher').classList.toggle('selected', role === 'teacher');
+  document.getElementById('roleAdmin').classList.toggle('selected', role === 'admin');
+  document.getElementById('classSelectWrap').style.display = role === 'teacher' ? '' : 'none';
+  document.getElementById('adminPasswordWrap').style.display = role === 'admin' ? '' : 'none';
+}
+
+async function doLogin() {
+  if (selectedRole === 'teacher') {
+    const classId = document.getElementById('loginClassSelect').value;
+    if (!classId) { showToast('请先选择班级', 'error'); return; }
+    state.role = 'teacher';
+    state.currentClassId = classId;
+    localStorage.setItem(LAST_ROLE_KEY, 'teacher');
+    localStorage.setItem(LAST_CLASS_KEY, classId);
+    // Carry over 长期居家 for today
+    await applyDefaultStatus(classId, todayStr());
+  } else {
+    const pwd = document.getElementById('adminPassword').value.trim();
+    if (!pwd) { showToast('请输入教务处密码', 'error'); return; }
+    if (pwd !== ADMIN_PASSWORD) { showToast('密码错误，请重试', 'error'); return; }
+    state.role = 'admin';
+    if (state.classes.length > 0) state.currentClassId = state.classes[0].id;
+    localStorage.setItem(LAST_ROLE_KEY, 'admin');
+  }
+  showMainApp();
+}
+
+function showMainApp() {
+  document.getElementById('loginScreen').classList.add('screen-hidden');
+  document.getElementById('configScreen').classList.add('screen-hidden');
+  document.getElementById('mainApp').classList.remove('screen-hidden');
+
+  // Configure tabs based on role
+  const tabsBar = document.getElementById('tabsBar');
+  if (state.role === 'teacher') {
+    // Teacher: only attendance tab
+    tabsBar.children[1].style.display = 'none'; // summary
+    tabsBar.children[2].style.display = 'none'; // settings
+    tabsBar.children[3].style.display = 'none'; // stats
+    switchTab('attendance');
+  } else {
+    tabsBar.children[1].style.display = '';
+    tabsBar.children[2].style.display = '';
+    tabsBar.children[3].style.display = '';
+    switchTab('summary');
+  }
+
+  renderHeader();
+  renderDateNav();
+  renderClassSelector();
+  renderSummary();
+  renderSettings();
+}
+
+function switchRole() {
+  state.role = null;
+  localStorage.removeItem(LAST_ROLE_KEY);
+  const pwdInput = document.getElementById('adminPassword');
+  if (pwdInput) pwdInput.value = '';
+  showLoginScreen();
+  selectRole('teacher');
+}
+
+// ============================================
+// Rendering
+// ============================================
+function renderHeader() {
+  document.getElementById('headerDate').textContent = formatDateCN(todayStr()) + ' ' + getDayOfWeek(todayStr());
+  const roleEl = document.getElementById('headerRole');
+  if (state.role === 'admin') {
+    roleEl.textContent = '教务处';
+  } else {
+    const cls = state.classes.find(c => c.id === state.currentClassId);
+    roleEl.textContent = cls ? cls.name + ' 班主任' : '班主任';
+  }
+}
+
+function renderDateNav() {
+  const isToday = state.viewDate === todayStr();
+  const dateText = formatDateCN(state.viewDate) + ' ' + getDayOfWeek(state.viewDate);
+  document.getElementById('viewDate').textContent = dateText;
+  document.getElementById('viewDateSum').textContent = dateText;
+  document.getElementById('todayBadge').style.display = isToday ? '' : 'none';
+  document.getElementById('todayBadgeSum').style.display = isToday ? '' : 'none';
+  document.getElementById('nextDayBtn').disabled = isToday;
+  document.getElementById('nextDaySumBtn').disabled = isToday;
+  document.getElementById('datePicker').value = state.viewDate;
+  document.getElementById('datePickerSum').value = state.viewDate;
+  document.getElementById('datePicker').max = todayStr();
+  document.getElementById('datePickerSum').max = todayStr();
+}
+
+async function jumpToDate(dateStr) {
+  if (!dateStr) return;
+  const today = todayStr();
+  if (dateStr > today) { showToast('不能选择未来的日期', 'error'); return; }
+  state.viewDate = dateStr;
+  state.attendanceCache = {};
+  if (state.currentClassId) {
+    await applyDefaultStatus(state.currentClassId, dateStr);
+  }
+  renderDateNav();
+  if (document.getElementById('tab-attendance').classList.contains('active')) renderStudentList();
+  if (document.getElementById('tab-summary').classList.contains('active')) renderSummary();
+  if (document.getElementById('tab-stats').classList.contains('active')) renderStats();
+}
+
+function renderClassSelector() {
+  const container = document.getElementById('classSelector');
+  if (state.role === 'teacher') {
+    document.getElementById('classSelectorCard').style.display = 'none';
+    renderStudentList();
+    return;
+  }
+  document.getElementById('classSelectorCard').style.display = '';
+  if (state.classes.length === 0) {
+    container.innerHTML = '<div style="color:var(--text2);padding:8px">暂无班级，请到「班级设置」添加</div>';
+    document.getElementById('studentList').innerHTML = '';
+    document.getElementById('statusBar').innerHTML = '';
+    document.getElementById('quickActions').style.display = 'none';
+    return;
+  }
+  if (!state.currentClassId || !state.classes.find(c => c.id === state.currentClassId)) {
+    state.currentClassId = state.classes[0].id;
+  }
+  container.innerHTML = state.classes.map(c =>
+    `<button class="class-btn ${c.id === state.currentClassId ? 'active' : ''}" onclick="selectClass('${c.id}')">${c.name}</button>`
+  ).join('');
+  renderStudentList();
+}
+
+function selectClass(classId) {
+  state.currentClassId = classId;
+  state.attendanceCache[classId] = null; // Force reload
+  renderClassSelector();
+}
+
+async function renderStudentList() {
+  const cls = state.classes.find(c => c.id === state.currentClassId);
+  if (!cls) return;
+
+  document.getElementById('classNameLabel').textContent = '· ' + cls.name;
+
+  if (cls.students.length === 0) {
+    document.getElementById('studentList').innerHTML =
+      '<div class="empty-state"><div class="text">该班级暂无学生</div><div class="hint">请到「班级设置」添加学生名单</div></div>';
+    document.getElementById('statusBar').innerHTML = '';
+    document.getElementById('quickActions').style.display = 'none';
+    return;
+  }
+
+  // Load attendance from cloud if not cached
+  if (!state.attendanceCache[state.currentClassId]) {
+    showLoading('加载考勤数据...');
+    try {
+      state.attendanceCache[state.currentClassId] = await loadAttendance(state.viewDate, state.currentClassId);
+      hideLoading();
+    } catch (err) {
+      hideLoading();
+      showToast('加载失败：' + err.message, 'error');
+      state.attendanceCache[state.currentClassId] = {};
+    }
+  }
+
+  const records = state.attendanceCache[state.currentClassId] || {};
+
+  document.getElementById('quickActions').style.display = state.viewDate === todayStr() ? '' : 'none';
+
+  const html = cls.students.map((s, i) => {
+    const status = records[s.name] || s.defaultStatus || '到';
+    const btns = STATUS_LIST.map(st =>
+      `<button class="status-btn ${st === status ? 'active' : ''}" data-s="${st}" onclick="setStatus('${s.name.replace(/'/g,"\\'")}','${st}')">${st}</button>`
+    ).join('');
+    let row = `<div class="student-row">`;
+    if (state.role === 'admin') {
+      row += `<span class="class-col">${cls.name}</span>`;
+    }
+    const genderClass = s.gender === '男' ? 'male' : (s.gender === '女' ? 'female' : '');
+    row += `<span class="num">${s.seq || i+1}</span>`;
+    row += `<span class="name">${s.name}</span>`;
+    row += `<span class="gender ${genderClass}">${s.gender || ''}</span>`;
+    row += `<div class="status-btns">${btns}</div>`;
+    row += `</div>`;
+    return row;
+  }).join('');
+  document.getElementById('studentList').innerHTML = html;
+
+  renderStatusBar(cls, records);
+}
+
+function renderStatusBar(cls, records) {
+  const counts = {};
+  STATUS_LIST.forEach(s => counts[s] = 0);
+  cls.students.forEach(s => {
+    const status = (records[s.name] || s.defaultStatus || '到');
+    counts[status] = (counts[status] || 0) + 1;
+  });
+  const html = STATUS_LIST.map(s => {
+    const c = STATUS_COLORS[s];
+    return `<span class="status-chip">
+      <span class="dot" style="background:${c}"></span>
+      ${s}
+      <span class="count" style="color:${c}">${counts[s]}</span>
+    </span>`;
+  }).join('');
+  document.getElementById('statusBar').innerHTML = html;
+}
+
+async function setStatus(studentName, status) {
+  const classId = state.currentClassId;
+  if (!state.attendanceCache[classId]) state.attendanceCache[classId] = {};
+  const records = state.attendanceCache[classId];
+  const cls0 = state.classes.find(c => c.id === classId);
+  const student0 = cls0 ? cls0.students.find(s => s.name === studentName) : null;
+  const oldStatus = records[studentName] || (student0 && student0.defaultStatus) || '到';
+
+  // Optimistic update
+  // If setting to '到' and student has no non-'到' default, delete (sparse storage)
+  // If student has a non-'到' default (e.g. 长期居家), store '到' explicitly to override
+  if (status === '到' && (!student0 || !student0.defaultStatus || student0.defaultStatus === '到')) {
+    delete records[studentName];
+  } else {
+    records[studentName] = status;
+  }
+
+  // Re-render immediately
+  const cls = state.classes.find(c => c.id === classId);
+  if (cls) {
+    const html = cls.students.map((s, i) => {
+      const st = records[s.name] || s.defaultStatus || '到';
+      const btns = STATUS_LIST.map(st2 =>
+        `<button class="status-btn ${st2 === st ? 'active' : ''}" data-s="${st2}" onclick="setStatus('${s.name.replace(/'/g,"\\'")}','${st2}')">${st2}</button>`
+      ).join('');
+      let row = `<div class="student-row">`;
+      if (state.role === 'admin') {
+        row += `<span class="class-col">${cls.name}</span>`;
+      }
+      const genderClass = s.gender === '男' ? 'male' : (s.gender === '女' ? 'female' : '');
+      row += `<span class="num">${s.seq || i+1}</span>`;
+      row += `<span class="name">${s.name}</span>`;
+      row += `<span class="gender ${genderClass}">${s.gender || ''}</span>`;
+      row += `<div class="status-btns">${btns}</div>`;
+      row += `</div>`;
+      return row;
+    }).join('');
+    document.getElementById('studentList').innerHTML = html;
+    renderStatusBar(cls, records);
+  }
+
+  showSaveStatus('saving');
+
+  // Save to cloud
+  try {
+    await saveAttendanceRecords(state.viewDate, classId, records);
+    showSaveStatus('saved');
+  } catch (err) {
+    // Revert
+    if (oldStatus === '到' && (!student0 || !student0.defaultStatus || student0.defaultStatus === '到')) {
+      delete records[studentName];
+    } else {
+      records[studentName] = oldStatus;
+    }
+    showSaveStatus('error');
+    showToast('保存失败：' + err.message, 'error');
+    // Re-render
+    renderStudentList();
+  }
+}
+
+async function resetAllToPresent() {
+  if (!confirm('确定将所有学生标记为「到」吗？')) return;
+  const classId = state.currentClassId;
+  const clsR = state.classes.find(c => c.id === classId);
+  const resetRecords = {};
+  if (clsR) {
+    clsR.students.forEach(s => {
+      if (s.defaultStatus && s.defaultStatus !== '到') {
+        resetRecords[s.name] = '到';  // Override non-'到' default
+      }
+    });
+  }
+  state.attendanceCache[classId] = resetRecords;
+  showSaveStatus('saving');
+  try {
+    await saveAttendanceRecords(state.viewDate, classId, {});
+    showSaveStatus('saved');
+    showToast('已全部标记为「到」', 'success');
+  } catch (err) {
+    showSaveStatus('error');
+    showToast('操作失败：' + err.message, 'error');
+  }
+  renderStudentList();
+}
+
+// ============================================
+// Summary
+// ============================================
+let summaryData = null;
+
+async function renderSummary() {
+  const table = document.getElementById('summaryTable');
+  if (state.classes.length === 0) {
+    table.innerHTML = '<tr><td style="padding:32px;color:var(--text2)">暂无班级数据，请先在「班级设置」中添加</td></tr>';
+    return;
+  }
+
+  // Show loading state
+  table.innerHTML = '<tr><td style="padding:24px;color:var(--text2)">⏳ 加载中...</td></tr>';
+
+  try {
+    const allRecords = await loadAllAttendance(state.viewDate);
+    summaryData = allRecords;
+
+    let html = '<thead><tr>';
+    html += '<th>班级</th><th>应到</th><th>到校</th><th>长期居家</th><th>病假</th><th>事假</th><th>迟到</th><th>上午离校</th><th>下午离校</th><th>未到校</th>';
+    html += '</tr></thead><tbody>';
+
+    const totals = { total: 0, present: 0, home: 0, sick: 0, personal: 0, late: 0, amLeave: 0, pmLeave: 0 };
+
+    state.classes.forEach(cls => {
+      const records = allRecords[cls.id] || {};
+      const counts = { '到': 0, '长期居家': 0, '病假': 0, '事假': 0, '迟到': 0, '上午请假离校': 0, '下午请假离校': 0 };
+      cls.students.forEach(s => {
+        const status = records[s.name] || s.defaultStatus || '到';
+        counts[status] = (counts[status] || 0) + 1;
+      });
+      const total = cls.students.length;
+      const notPresent = total - counts['到'] - counts['迟到'] - counts['上午请假离校'] - counts['下午请假离校'];
+
+      html += `<tr>`;
+      html += `<td style="font-weight:500">${cls.name}</td>`;
+      html += `<td>${total}</td>`;
+      html += `<td style="color:var(--green);font-weight:700">${counts['到']}</td>`;
+      html += `<td style="color:var(--gray)">${counts['长期居家']}</td>`;
+      html += `<td style="color:var(--orange)">${counts['病假']}</td>`;
+      html += `<td style="color:var(--yellow)">${counts['事假']}</td>`;
+      html += `<td style="color:var(--red)">${counts['迟到']}</td>`;
+      html += `<td style="color:#08979c">${counts['上午请假离校']}</td>`;
+      html += `<td style="color:#722ed1">${counts['下午请假离校']}</td>`;
+      html += `<td style="font-weight:600">${notPresent}</td>`;
+      html += `</tr>`;
+
+      totals.total += total;
+      totals.present += counts['到'];
+      totals.home += counts['长期居家'];
+      totals.sick += counts['病假'];
+      totals.personal += counts['事假'];
+      totals.late += counts['迟到'];
+      totals.amLeave += counts['上午请假离校'];
+      totals.pmLeave += counts['下午请假离校'];
+    });
+
+    const totalNotPresent = totals.total - totals.present - totals.late - totals.amLeave - totals.pmLeave;
+    html += `<tr class="total-row">`;
+    html += `<td>合计</td>`;
+    html += `<td>${totals.total}</td>`;
+    html += `<td>${totals.present}</td>`;
+    html += `<td>${totals.home}</td>`;
+    html += `<td>${totals.sick}</td>`;
+    html += `<td>${totals.personal}</td>`;
+    html += `<td>${totals.late}</td>`;
+    html += `<td>${totals.amLeave}</td>`;
+    html += `<td>${totals.pmLeave}</td>`;
+    html += `<td>${totalNotPresent}</td>`;
+    html += `</tr></tbody>`;
+    table.innerHTML = html;
+
+    // Render detail (absent students per class)
+    renderSummaryDetail(allRecords);
+  } catch (err) {
+    table.innerHTML = `<tr><td style="padding:24px;color:var(--red)">加载失败：${err.message}</td></tr>`;
+  }
+}
+
+function renderSummaryDetail(allRecords) {
+  let html = '<div class="card-title" style="margin-top:8px">📝 未到校学生明细</div>';
+  let hasAny = false;
+
+  state.classes.forEach(cls => {
+    const records = allRecords[cls.id] || {};
+    const absent = cls.students.filter(s => records[s.name] && records[s.name] !== '到');
+    if (absent.length > 0) {
+      hasAny = true;
+      html += `<div style="margin-bottom:10px">
+        <span style="font-weight:600;font-size:14px">${cls.name}</span>
+        <span style="color:var(--text2);font-size:13px">（${absent.length}人）</span>：`;
+      html += absent.map(s =>
+        `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;border-radius:4px;background:${STATUS_BG[records[s.name]]};color:${STATUS_COLORS[records[s.name]]};font-size:13px">${s.name}-${records[s.name]}</span>`
+      ).join('');
+      html += '</div>';
+    }
+  });
+
+  if (!hasAny) {
+    html += '<div style="color:var(--text2);font-size:14px;padding:8px 0">🎉 全员到校！</div>';
+  }
+
+  document.getElementById('summaryDetail').innerHTML = html;
+}
+
+function getDateRange(period) {
+  const base = new Date(state.viewDate + 'T00:00:00');
+  const today = new Date(todayStr() + 'T00:00:00');
+  let dates = [];
+  if (period === 'day') {
+    dates = [state.viewDate];
+  } else if (period === 'week') {
+    // 本周：周一到当天（不超当天）
+    const day = base.getDay(); // 0=周日
+    const monday = new Date(base);
+    monday.setDate(base.getDate() - (day === 0 ? 6 : day - 1));
+    const start = monday < new Date('2020-01-01') ? new Date('2020-01-01') : monday;
+    for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+      dates.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'));
+    }
+  } else if (period === 'month') {
+    // 本月：1号到当天
+    const first = new Date(base.getFullYear(), base.getMonth(), 1);
+    for (let d = new Date(first); d <= today; d.setDate(d.getDate() + 1)) {
+      dates.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'));
+    }
+  }
+  return dates;
+}
+
+function calcCountsForRecords(cls, records) {
+  const counts = { '到': 0, '长期居家': 0, '病假': 0, '事假': 0, '迟到': 0, '上午请假离校': 0, '下午请假离校': 0 };
+  cls.students.forEach(s => {
+    const status = records[s.name] || s.defaultStatus || '到';
+    counts[status] = (counts[status] || 0) + 1;
+  });
+  return counts;
+}
+
+async function exportSummary(period) {
+  const labels = { day: '本日', week: '本周', month: '本月' };
+  const dates = getDateRange(period);
+  if (dates.length === 0) { showToast('没有可导出的数据', 'error'); return; }
+
+  showLoading('正在导出' + labels[period] + '数据...');
+  try {
+    // 加载所有日期的数据
+    const allData = {};
+    for (const dateStr of dates) {
+      allData[dateStr] = await loadAllAttendance(dateStr);
+    }
+
+    let csv = '\uFEFF';
+    csv += `级部考勤汇总 - ${labels[period]}（${formatDateCN(dates[0])}`;
+    if (dates.length > 1) {
+      csv += ` 至 ${formatDateCN(dates[dates.length - 1])}`;
+    }
+    csv += `）\n\n`;
+
+    if (period === 'day') {
+      // 单日：与之前格式一致
+      csv += '班级,应到,到校,长期居家,病假,事假,迟到,上午离校,下午离校,未到校合计\n';
+      const records = allData[dates[0]];
+      const totals = { total: 0, present: 0, home: 0, sick: 0, personal: 0, late: 0, amLeave: 0, pmLeave: 0 };
+      state.classes.forEach(cls => {
+        const counts = calcCountsForRecords(cls, records[cls.id] || {});
+        const total = cls.students.length;
+        const notPresent = total - counts['到'] - counts['迟到'] - counts['上午请假离校'] - counts['下午请假离校'];
+        csv += `${cls.name},${total},${counts['到']},${counts['长期居家']},${counts['病假']},${counts['事假']},${counts['迟到']},${counts['上午请假离校']},${counts['下午请假离校']},${notPresent}\n`;
+        totals.total += total; totals.present += counts['到']; totals.home += counts['长期居家'];
+        totals.sick += counts['病假']; totals.personal += counts['事假']; totals.late += counts['迟到'];
+        totals.amLeave += counts['上午请假离校']; totals.pmLeave += counts['下午请假离校'];
+      });
+      const totalNotPresent = totals.total - totals.present - totals.late - totals.amLeave - totals.pmLeave;
+      csv += `合计,${totals.total},${totals.present},${totals.home},${totals.sick},${totals.personal},${totals.late},${totals.amLeave},${totals.pmLeave},${totalNotPresent}\n`;
+
+      // 缺勤明细
+      csv += '\n--- 各班缺勤明细 ---\n';
+      state.classes.forEach(cls => {
+        const clsRecords = records[cls.id] || {};
+        const absent = cls.students.filter(s => clsRecords[s.name] && clsRecords[s.name] !== '到' && clsRecords[s.name] !== '上午请假离校' && clsRecords[s.name] !== '下午请假离校');
+        const earlyLeave = cls.students.filter(s => clsRecords[s.name] === '上午请假离校' || clsRecords[s.name] === '下午请假离校');
+        const abnormal = absent.concat(earlyLeave);
+        csv += `\n${cls.name}（${abnormal.length}人异常）\n`;
+        if (abnormal.length === 0) { csv += '（全员正常）\n'; }
+        else { absent.forEach(s => csv += `  ${s.name} - ${clsRecords[s.name]}\n`); }
+      });
+    } else {
+      // 多日：按日期×班级交叉表
+      // 第一部分：每日汇总
+      csv += '=== 每日汇总 ===\n\n';
+      csv += '日期,星期,应到,到校,长期居家,病假,事假,迟到,上午离校,下午离校,未到校\n';
+      const grandTotals = { total: 0, present: 0, home: 0, sick: 0, personal: 0, late: 0, amLeave: 0, pmLeave: 0 };
+      dates.forEach(dateStr => {
+        const records = allData[dateStr];
+        const totals = { total: 0, present: 0, home: 0, sick: 0, personal: 0, late: 0, amLeave: 0, pmLeave: 0 };
+        state.classes.forEach(cls => {
+          const counts = calcCountsForRecords(cls, records[cls.id] || {});
+          totals.total += cls.students.length;
+          totals.present += counts['到'];
+          totals.home += counts['长期居家'];
+          totals.sick += counts['病假'];
+          totals.personal += counts['事假'];
+          totals.late += counts['迟到'];
+          totals.amLeave += counts['上午请假离校'];
+          totals.pmLeave += counts['下午请假离校'];
+        });
+        const notPresent = totals.total - totals.present - totals.late - totals.amLeave - totals.pmLeave;
+        csv += `${formatDateCN(dateStr)},${getDayOfWeek(dateStr)},${totals.total},${totals.present},${totals.home},${totals.sick},${totals.personal},${totals.late},${totals.amLeave},${totals.pmLeave},${notPresent}\n`;
+        Object.keys(grandTotals).forEach(k => grandTotals[k] += totals[k]);
+      });
+      const grandNotPresent = grandTotals.total - grandTotals.present - grandTotals.late - grandTotals.amLeave - grandTotals.pmLeave;
+      csv += `合计,${grandTotals.total},${grandTotals.present},${grandTotals.home},${grandTotals.sick},${grandTotals.personal},${grandTotals.late},${grandTotals.amLeave},${grandTotals.pmLeave},${grandNotPresent}\n`;
+
+      // 第二部分：各班累计
+      csv += '\n=== 各班级累计 ===\n\n';
+      csv += '班级,应到(人天),到校,长期居家,病假,事假,迟到,上午离校,下午离校,未到校\n';
+      const classTotals = {};
+      state.classes.forEach(cls => {
+        const t = { total: 0, present: 0, home: 0, sick: 0, personal: 0, late: 0, amLeave: 0, pmLeave: 0 };
+        dates.forEach(dateStr => {
+          const counts = calcCountsForRecords(cls, allData[dateStr][cls.id] || {});
+          t.total += cls.students.length;
+          t.present += counts['到'];
+          t.home += counts['长期居家'];
+          t.sick += counts['病假'];
+          t.personal += counts['事假'];
+          t.late += counts['迟到'];
+          t.amLeave += counts['上午请假离校'];
+          t.pmLeave += counts['下午请假离校'];
+        });
+        const notPresent = t.total - t.present - t.late - t.amLeave - t.pmLeave;
+        csv += `${cls.name},${t.total},${t.present},${t.home},${t.sick},${t.personal},${t.late},${t.amLeave},${t.pmLeave},${notPresent}\n`;
+      });
+
+      // 第三部分：缺勤明细
+      csv += '\n=== 缺勤明细 ===\n\n';
+      dates.forEach(dateStr => {
+        const records = allData[dateStr];
+        let anyAbsent = false;
+        state.classes.forEach(cls => {
+          const clsRecords = records[cls.id] || {};
+          const absent = cls.students.filter(s => clsRecords[s.name] && clsRecords[s.name] !== '到');
+          if (absent.length > 0) {
+            if (!anyAbsent) { csv += `\n${formatDateCN(dateStr)} ${getDayOfWeek(dateStr)}\n`; anyAbsent = true; }
+            csv += `  ${cls.name}：`;
+            csv += absent.map(s => `${s.name}(${clsRecords[s.name]})`).join('、');
+            csv += '\n';
+          }
+        });
+      });
+    }
+
+    hideLoading();
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const periodLabel = period === 'day' ? dates[0] : `${dates[0]}_${dates[dates.length-1]}`;
+    a.href = url; a.download = `考勤汇总_${periodLabel}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    showToast(labels[period] + '数据已导出', 'success');
+  } catch (err) {
+    hideLoading();
+    showToast('导出失败：' + err.message, 'error');
+  }
+}
+
+// ============================================
+// Settings (Admin)
+// ============================================
+
+// 更新班级记录（数据库已修复触发器，直接 UPDATE 即可）
+async function replaceClassRecord(cls) {
+  const { error } = await sb.from('classes').update({
+    name: cls.name, students: cls.students
+  }).eq('id', cls.id);
+  if (error) throw error;
+}
+
+function renderSettings() {
+  const container = document.getElementById('settingsList');
+  if (state.classes.length === 0) {
+    container.innerHTML = '<div class="card"><div class="empty-state"><div class="text">暂无班级</div><div class="hint">点击上方「添加班级」开始</div></div></div>';
+    return;
+  }
+  container.innerHTML = state.classes.map(cls => `
+    <div class="card">
+      <div class="class-card-header">
+        <input type="text" value="${cls.name}" onchange="updateClassName('${cls.id}', this.value)">
+        <button class="btn btn-danger btn-sm" onclick="deleteClass('${cls.id}')">删除班级</button>
+      </div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px">共 ${cls.students.length} 名学生</div>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px">
+        <thead><tr style="background:var(--primary-light);color:var(--primary-dark)">
+          <th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:center;width:50px">序号</th>
+          <th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:left">姓名</th>
+          <th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:center;width:60px">性别</th>
+          <th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:center;width:90px">默认状态</th>
+          <th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:center;width:50px">操作</th>
+        </tr></thead>
+        <tbody>
+          ${cls.students.map((s, i) =>
+            `<tr><td style="padding:4px 8px;border:1px solid var(--border);text-align:center">${s.seq || i+1}</td>` +
+            `<td style="padding:4px 8px;border:1px solid var(--border)">${s.name}</td>` +
+            `<td style="padding:4px 8px;border:1px solid var(--border);text-align:center">${s.gender || ''}</td>` +
+            `<td style="padding:4px 8px;border:1px solid var(--border);text-align:center"><select onchange="updateStudentDefaultStatus('${cls.id}',${i},this.value)" style="padding:3px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;background:transparent">              <option value="到" ${(!s.defaultStatus || s.defaultStatus==='到')?'selected':''}>到</option>              <option value="长期居家" ${s.defaultStatus==='长期居家'?'selected':''}>长期居家</option>              <option value="病假" ${s.defaultStatus==='病假'?'selected':''}>病假</option>              <option value="事假" ${s.defaultStatus==='事假'?'selected':''}>事假</option>              <option value="迟到" ${s.defaultStatus==='迟到'?'selected':''}>迟到</option>              <option value="上午请假离校" ${s.defaultStatus==='上午请假离校'?'selected':''}>上午离校</option>              <option value="下午请假离校" ${s.defaultStatus==='下午请假离校'?'selected':''}>下午离校</option>            </select></td>` +
+            `<td style="padding:4px 8px;border:1px solid var(--border);text-align:center"><span class="remove" style="cursor:pointer;color:var(--red);font-size:16px" onclick="removeStudent('${cls.id}',${i})">×</span></td></tr>`
+          ).join('') || '<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--text2)">暂无学生</td></tr>'}
+        </tbody>
+      </table>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <input type="number" class="add-student-input" id="addSeq_${cls.id}" placeholder="序号" style="width:60px">
+        <input type="text" class="add-student-input" id="addName_${cls.id}" placeholder="姓名" style="width:100px"
+          onkeydown="if(event.key==='Enter')addStudentFromInput('${cls.id}')">
+        <select id="addGender_${cls.id}" style="padding:5px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+          <option value="">性别</option>
+          <option value="男">男</option>
+          <option value="女">女</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="addStudentFromInput('${cls.id}')">+ 添加</button>
+        <button class="btn btn-outline btn-sm" onclick="batchAdd('${cls.id}')">批量添加</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addClass() {
+  const id = 'c' + Date.now();
+  const num = state.classes.length + 1;
+  const maxSort = state.classes.length > 0 ? Math.max(...state.classes.map(c => c.sort_order || 0)) : -1;
+  try {
+    const { error } = await sb.from('classes').insert({
+      id: id, name: num + '班', students: [], sort_order: maxSort + 1
+    });
+    if (error) throw error;
+    await loadClasses();
+    renderSettings();
+    showToast('班级已添加', 'success');
+  } catch (err) {
+    showToast('添加失败：' + err.message, 'error');
+  }
+}
+
+async function deleteClass(id) {
+  if (!confirm('确定删除该班级吗？相关考勤数据也将删除。')) return;
+  try {
+    const { error } = await sb.from('classes').delete().eq('id', id);
+    if (error) throw error;
+    await loadClasses();
+    renderSettings();
+    renderClassSelector();
+    showToast('班级已删除', 'success');
+  } catch (err) {
+    showToast('删除失败：' + err.message, 'error');
+  }
+}
+
+async function updateClassName(id, name) {
+  name = name.trim();
+  if (!name) return;
+  const cls = state.classes.find(c => c.id === id);
+  if (!cls) return;
+  try {
+    cls.name = name;
+    await replaceClassRecord(cls);
+    await loadClasses();
+    renderHeader();
+    renderClassSelector();
+  } catch (err) {
+    showToast('更新失败：' + err.message, 'error');
+  }
+}
+
+async function addStudentFromInput(classId) {
+  const nameInput = document.getElementById('addName_' + classId);
+  const seqInput = document.getElementById('addSeq_' + classId);
+  const genderInput = document.getElementById('addGender_' + classId);
+  if (!nameInput) return;
+  const name = nameInput.value.trim();
+  if (!name) { showToast('请输入姓名', 'error'); return; }
+  const cls = state.classes.find(c => c.id === classId);
+  if (!cls) return;
+  if (cls.students.some(s => s.name === name)) { showToast('该学生已存在', 'error'); return; }
+  const seq = parseInt(seqInput.value) || (cls.students.length > 0 ? Math.max(...cls.students.map(s => s.seq || 0)) + 1 : 1);
+  const gender = genderInput.value || '';
+  const newStudents = [...cls.students, { seq, name, gender, defaultStatus: '到' }];
+  try {
+    cls.students = newStudents;
+    await replaceClassRecord(cls);
+    renderSettings();
+    const newNameInput = document.getElementById('addName_' + classId);
+    if (newNameInput) { newNameInput.value = ''; newNameInput.focus(); }
+    const newSeqInput = document.getElementById('addSeq_' + classId);
+    if (newSeqInput) newSeqInput.value = '';
+    const newGenderInput = document.getElementById('addGender_' + classId);
+    if (newGenderInput) newGenderInput.value = '';
+  } catch (err) {
+    showToast('添加失败：' + err.message, 'error');
+  }
+}
+
+async function removeStudent(classId, index) {
+  const cls = state.classes.find(c => c.id === classId);
+  if (!cls) return;
+  const newStudents = cls.students.filter((_, i) => i !== index);
+  try {
+    cls.students = newStudents;
+    await replaceClassRecord(cls);
+    renderSettings();
+  } catch (err) {
+    showToast('删除失败：' + err.message, 'error');
+  }
+}
+
+async function batchAdd(classId) {
+  const text = prompt('请输入学生信息，每行一个，格式：序号,姓名,性别\n（也可省略序号，格式：姓名,性别）\n示例：\n1,张三,男\n2,李四,女\n3,王五,男');
+  if (!text) return;
+  const cls = state.classes.find(c => c.id === classId);
+  if (!cls) return;
+  const newStudents = [...cls.students];
+  let maxSeq = newStudents.length > 0 ? Math.max(...newStudents.map(s => s.seq || 0)) : 0;
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  let added = 0;
+  lines.forEach(line => {
+    const parts = line.split(/[,，]/).map(p => p.trim());
+    let seq, name, gender;
+    if (parts.length >= 3) {
+      seq = parseInt(parts[0]) || (++maxSeq);
+      name = parts[1];
+      gender = parts[2];
+    } else if (parts.length === 2) {
+      seq = ++maxSeq;
+      name = parts[0];
+      gender = parts[1];
+    } else {
+      seq = ++maxSeq;
+      name = parts[0];
+      gender = '';
+    }
+    if (name && !newStudents.some(s => s.name === name)) {
+      newStudents.push({ seq, name, gender, defaultStatus: '到' });
+      added++;
+    }
+  });
+  try {
+    cls.students = newStudents;
+    await replaceClassRecord(cls);
+    renderSettings();
+    showToast(`已添加 ${added} 名学生`, 'success');
+  } catch (err) {
+    showToast('添加失败：' + err.message, 'error');
+  }
+}
+
+async function updateStudentDefaultStatus(classId, studentIndex, newStatus) {
+  const cls = state.classes.find(c => c.id === classId);
+  if (!cls || !cls.students[studentIndex]) return;
+  const student = cls.students[studentIndex];
+  student.defaultStatus = newStatus;
+  try {
+    await replaceClassRecord(cls);
+    showToast(`${student.name} 的默认状态已设为：${newStatus}`, 'success');
+  } catch (err) {
+    showToast('更新失败：' + err.message, 'error');
+  }
+}
+
+// ============================================
+// Navigation
+// ============================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    const tabs = ['attendance', 'summary', 'settings', 'stats'];
+    btn.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'attendance') renderStudentList();
+  if (tab === 'summary') renderSummary();
+  if (tab === 'settings') renderSettings();
+  if (tab === 'stats') renderStats();
+}
+
+async function changeDate(offset) {
+  const newDate = dateOffset(state.viewDate, offset);
+  if (offset > 0 && newDate > todayStr()) return;
+  state.viewDate = newDate;
+  // Clear cache for new date
+  state.attendanceCache = {};
+  // Carry over for new date
+  if (!state.currentClassId && state.classes.length > 0) {
+    state.currentClassId = state.classes[0].id;
+  }
+  if (state.currentClassId) {
+    await applyDefaultStatus(state.currentClassId, newDate);
+  }
+  renderDateNav();
+  if (document.getElementById('tab-attendance').classList.contains('active')) renderStudentList();
+  if (document.getElementById('tab-summary').classList.contains('active')) renderSummary();
+}
+
+async function refreshData() {
+  showLoading('刷新中...');
+  try {
+    await loadClasses();
+    state.attendanceCache = {};
+    renderHeader();
+    renderDateNav();
+    renderClassSelector();
+    if (document.getElementById('tab-summary').classList.contains('active')) renderSummary();
+    if (document.getElementById('tab-stats').classList.contains('active')) renderStats();
+    hideLoading();
+    showToast('数据已刷新', 'success');
+  } catch (err) {
+    hideLoading();
+    showToast('刷新失败：' + err.message, 'error');
+  }
+}
+
+
+// ============================================
+// Statistics & Analysis
+// ============================================
+let statsCharts = {};
+let statsData = null;
+
+function getSemesterStart() {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  let year = now.getFullYear();
+  // 2-8月 = 春季学期(2月1日开始)，9-1月 = 秋季学期(9月1日开始)
+  if (month >= 2 && month <= 8) {
+    return year + '-02-01';
+  } else if (month >= 9) {
+    return year + '-09-01';
+  } else {
+    return (year - 1) + '-09-01';
+  }
+}
+
+function getMonthStart() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+}
+
+function onStatsRangeChange() {
+  const range = document.getElementById('statsRange').value;
+  const startInput = document.getElementById('statsStart');
+  const endInput = document.getElementById('statsEnd');
+  if (range === 'custom') {
+    startInput.style.display = '';
+    endInput.style.display = '';
+  } else {
+    startInput.style.display = 'none';
+    endInput.style.display = 'none';
+    renderStats();
+  }
+}
+
+function getStatsDateRange() {
+  const range = document.getElementById('statsRange') ? document.getElementById('statsRange').value : 'month';
+  const today = todayStr();
+  let start, end;
+  if (range === 'month') {
+    start = getMonthStart();
+    end = today;
+  } else if (range === 'semester') {
+    start = getSemesterStart();
+    end = today;
+  } else {
+    start = document.getElementById('statsStart').value || getMonthStart();
+    end = document.getElementById('statsEnd').value || today;
+    if (start > end) { [start, end] = [end, start]; }
+    if (end > today) end = today;
+  }
+  return { start, end };
+}
+
+function getDatesInRange(start, end) {
+  const dates = [];
+  let d = new Date(start + 'T00:00:00');
+  const endD = new Date(end + 'T00:00:00');
+  while (d <= endD) {
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) { // Skip weekends
+      dates.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'));
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
+async function loadRangeAttendance(start, end) {
+  const { data, error } = await sb.from('attendance')
+    .select('date, class_id, records')
+    .gte('date', start)
+    .lte('date', end)
+    .order('date', { ascending: true });
+  if (error) throw error;
+  // Group by date
+  const byDate = {};
+  if (data) {
+    data.forEach(row => {
+      if (!byDate[row.date]) byDate[row.date] = {};
+      byDate[row.date][row.class_id] = row.records || {};
+    });
+  }
+  return byDate;
+}
+
+function destroyStatsCharts() {
+  Object.values(statsCharts).forEach(chart => { if (chart) chart.destroy(); });
+  statsCharts = {};
+}
+
+async function renderStats() {
+  if (typeof Chart === 'undefined') {
+    showToast('图表库加载中，请稍后重试', 'error');
+    return;
+  }
+  if (state.classes.length === 0) {
+    document.getElementById('statsCharts').innerHTML = '<div class="empty-state"><div class="text">暂无班级数据</div></div>';
+    document.getElementById('statsAlerts').innerHTML = '';
+    document.getElementById('statsSummary').innerHTML = '';
+    document.getElementById('statsClassDetail').innerHTML = '';
+    return;
+  }
+
+  const { start, end } = getStatsDateRange();
+  const dates = getDatesInRange(start, end);
+  if (dates.length === 0) {
+    document.getElementById('statsCharts').innerHTML = '<div class="empty-state"><div class="text">该范围内无工作日数据</div></div>';
+    return;
+  }
+
+  showLoading('加载统计数据...');
+  try {
+    const byDate = await loadRangeAttendance(start, end);
+    statsData = { byDate, dates, start, end };
+    hideLoading();
+
+    destroyStatsCharts();
+    renderStatsSummary(dates, byDate);
+    renderStatsCharts(dates, byDate);
+    renderStatsAlerts(dates, byDate);
+    renderStatsClassDetail(dates, byDate);
+  } catch (err) {
+    hideLoading();
+    showToast('统计加载失败：' + err.message, 'error');
+  }
+}
+
+function calcStudentStats(dates, byDate, cls) {
+  const studentStats = {};
+  cls.students.forEach(s => {
+    studentStats[s.name] = {
+      name: s.name, seq: s.seq, gender: s.gender, className: cls.name,
+      present: 0, absent: 0, late: 0, sick: 0, personal: 0, home: 0,
+      amLeave: 0, pmLeave: 0, totalDays: 0,
+      records: []
+    };
+  });
+  dates.forEach(dateStr => {
+    const records = (byDate[dateStr] && byDate[dateStr][cls.id]) || {};
+    cls.students.forEach(s => {
+      const st = studentStats[s.name];
+      const status = records[s.name] || s.defaultStatus || '到';
+      st.totalDays++;
+      st.records.push({ date: dateStr, status });
+      if (status === '到') st.present++;
+      else if (status === '迟到') st.late++;
+      else if (status === '病假') st.sick++;
+      else if (status === '事假') st.personal++;
+      else if (status === '长期居家') st.home++;
+      else if (status === '上午请假离校') st.amLeave++;
+      else if (status === '下午请假离校') st.pmLeave++;
+      else st.absent++;
+    });
+  });
+  return studentStats;
+}
+
+function renderStatsSummary(dates, byDate) {
+  let totalStudents = 0, totalRecords = 0;
+  let present = 0, absent = 0, late = 0, sick = 0;
+  state.classes.forEach(cls => {
+    totalStudents += cls.students.length;
+    dates.forEach(dateStr => {
+      const records = (byDate[dateStr] && byDate[dateStr][cls.id]) || {};
+      cls.students.forEach(s => {
+        totalRecords++;
+        const status = records[s.name] || s.defaultStatus || '到';
+        if (status === '到') present++;
+        else if (status === '迟到') late++;
+        else if (status === '病假') sick++;
+        else if (status === '长期居家') absent++;
+        else if (status === '事假') absent++;
+        else if (status === '上午请假离校') present++;
+        else if (status === '下午请假离校') present++;
+        else absent++;
+      });
+    });
+  });
+  const rate = totalRecords > 0 ? ((present / totalRecords) * 100).toFixed(1) : 0;
+  const html = `
+    <div class="stat-card"><div class="num" style="color:var(--primary)">${dates.length}</div><div class="label">统计天数</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--green)">${rate}%</div><div class="label">出勤率</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--green)">${present}</div><div class="label">到校人次</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--red)">${late}</div><div class="label">迟到人次</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--orange)">${sick}</div><div class="label">病假人次</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--gray)">${absent}</div><div class="label">缺勤人次</div></div>
+  `;
+  document.getElementById('statsSummary').innerHTML = html;
+}
+
+function renderStatsCharts(dates, byDate) {
+  const container = document.getElementById('statsCharts');
+  // Chart 1: Daily attendance trend (line)
+  const dailyData = dates.map(d => {
+    let present = 0, total = 0;
+    state.classes.forEach(cls => {
+      const records = (byDate[d] && byDate[d][cls.id]) || {};
+      cls.students.forEach(s => {
+        total++;
+        const status = records[s.name] || s.defaultStatus || '到';
+        if (status === '到' || status === '上午请假离校' || status === '下午请假离校') present++;
+      });
+    });
+    return total > 0 ? Math.round((present / total) * 100) : 0;
+  });
+
+  // Chart 2: Class comparison (bar)
+  const classRates = state.classes.map(cls => {
+    let present = 0, total = 0;
+    dates.forEach(d => {
+      const records = (byDate[d] && byDate[d][cls.id]) || {};
+      cls.students.forEach(s => {
+        total++;
+        const status = records[s.name] || s.defaultStatus || '到';
+        if (status === '到' || status === '上午请假离校' || status === '下午请假离校') present++;
+      });
+    });
+    return total > 0 ? Math.round((present / total) * 100) : 0;
+  });
+
+  // Chart 3: Absence type distribution (doughnut)
+  const typeCounts = { '迟到': 0, '病假': 0, '事假': 0, '长期居家': 0, '上午请假离校': 0, '下午请假离校': 0 };
+  dates.forEach(d => {
+    state.classes.forEach(cls => {
+      const records = (byDate[d] && byDate[d][cls.id]) || {};
+      cls.students.forEach(s => {
+        const status = records[s.name] || s.defaultStatus || '到';
+        if (typeCounts[status] !== undefined) typeCounts[status]++;
+      });
+    });
+  });
+
+  // Chart 4: Class absence breakdown (stacked bar)
+  const classAbsence = state.classes.map(cls => {
+    const types = { '迟到': 0, '病假': 0, '事假': 0, '长期居家': 0, '上午请假离校': 0, '下午请假离校': 0 };
+    dates.forEach(d => {
+      const records = (byDate[d] && byDate[d][cls.id]) || {};
+      cls.students.forEach(s => {
+        const status = records[s.name] || s.defaultStatus || '到';
+        if (types[status] !== undefined) types[status]++;
+      });
+    });
+    return types;
+  });
+
+  const shortDates = dates.map(d => d.substring(5));
+  const classNames = state.classes.map(c => c.name);
+  const typeColors = ['#f5222d', '#fa8c16', '#d4b106', '#8c8c8c', '#08979c', '#722ed1'];
+  const typeLabels = ['迟到', '病假', '事假', '长期居家', '上午请假离校', '下午请假离校'];
+
+  container.innerHTML = `
+    <div class="chart-box full">
+      <h3 style="font-size:15px;font-weight:600;margin-bottom:8px">📊 每日出勤率趋势</h3>
+      <canvas id="chartDaily" class="tall"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3 style="font-size:15px;font-weight:600;margin-bottom:8px">🏫 各班出勤率对比</h3>
+      <canvas id="chartClass"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3 style="font-size:15px;font-weight:600;margin-bottom:8px"> 🥧 缺勤类型分布</h3>
+      <canvas id="chartType"></canvas>
+    </div>
+    <div class="chart-box full">
+      <h3 style="font-size:15px;font-weight:600;margin-bottom:8px">📊 各班缺勤类型明细</h3>
+      <canvas id="chartClassAbsence" class="tall"></canvas>
+    </div>
+  `;
+
+  // Chart 1: Daily trend
+  statsCharts.daily = new Chart(document.getElementById('chartDaily'), {
+    type: 'line',
+    data: {
+      labels: shortDates,
+      datasets: [{
+        label: '出勤率(%)', data: dailyData,
+        borderColor: '#1677ff', backgroundColor: 'rgba(22,119,255,0.1)',
+        fill: true, tension: 0.3, pointRadius: 3, pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+    }
+  });
+
+  // Chart 2: Class comparison
+  statsCharts.classRate = new Chart(document.getElementById('chartClass'), {
+    type: 'bar',
+    data: {
+      labels: classNames,
+      datasets: [{ label: '出勤率(%)', data: classRates, backgroundColor: '#1677ff', borderRadius: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+    }
+  });
+
+  // Chart 3: Absence type pie
+  statsCharts.typeDist = new Chart(document.getElementById('chartType'), {
+    type: 'doughnut',
+    data: {
+      labels: typeLabels,
+      datasets: [{ data: typeLabels.map(l => typeCounts[l]), backgroundColor: typeColors }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { font: { size: 12 }, padding: 8 } } }
+    }
+  });
+
+  // Chart 4: Class absence stacked bar
+  statsCharts.classAbsence = new Chart(document.getElementById('chartClassAbsence'), {
+    type: 'bar',
+    data: {
+      labels: classNames,
+      datasets: typeLabels.map((label, i) => ({
+        label: label,
+        data: classAbsence.map(c => c[label]),
+        backgroundColor: typeColors[i],
+        borderRadius: 4
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 6 } } }
+    }
+  });
+}
+
+function renderStatsAlerts(dates, byDate) {
+  const alerts = [];
+  state.classes.forEach(cls => {
+    const studentStats = calcStudentStats(dates, byDate, cls);
+    Object.values(studentStats).forEach(st => {
+      const absentCount = st.sick + st.personal + st.home + st.absent;
+      const lateCount = st.late;
+      const totalAbnormal = absentCount + lateCount + st.amLeave + st.pmLeave;
+      const abnormalRate = st.totalDays > 0 ? (totalAbnormal / st.totalDays) * 100 : 0;
+      const absentRate = st.totalDays > 0 ? (absentCount / st.totalDays) * 100 : 0;
+      // Alert thresholds
+      if (absentRate >= 20 || totalAbnormal >= st.totalDays * 0.3 || absentCount >= 3 || lateCount >= 3) {
+        alerts.push({
+          ...st, absentCount, lateCount, totalAbnormal,
+          absentRate: absentRate.toFixed(0), abnormalRate: abnormalRate.toFixed(0),
+          level: absentRate >= 30 || totalAbnormal >= st.totalDays * 0.5 ? 'high' : 'warn'
+        });
+      }
+    });
+  });
+  // Sort by abnormal count desc
+  alerts.sort((a, b) => b.totalAbnormal - a.totalAbnormal);
+
+  if (alerts.length === 0) {
+    document.getElementById('statsAlerts').innerHTML =
+      '<div style="text-align:center;padding:24px;color:var(--green);font-size:15px">🎉 该时间段内无重点关注学生，全员出勤情况良好</div>';
+    return;
+  }
+
+  const html = alerts.map(a => {
+    const badges = [];
+    if (a.absentCount >= 3) badges.push(`<span class="alert-badge" style="background:var(--red)">缺勤${a.absentCount}次</span>`);
+    if (a.lateCount >= 3) badges.push(`<span class="alert-badge" style="background:var(--orange)">迟到${a.lateCount}次</span>`);
+    if (a.sick >= 2) badges.push(`<span class="alert-badge" style="background:var(--orange)">病假${a.sick}次</span>`);
+    if (a.home > 0) badges.push(`<span class="alert-badge" style="background:var(--gray)">长期居家${a.home}天</span>`);
+    if (a.amLeave + a.pmLeave >= 2) badges.push(`<span class="alert-badge" style="background:#08979c">早退${a.amLeave+a.pmLeave}次</span>`);
+
+    let detail = `${a.className} · 共${a.totalDays}天 · 异常${a.totalAbnormal}次(${a.abnormalRate}%) · 缺勤${a.absentCount}次(${a.absentRate}%)`;
+    const details = [];
+    if (a.late > 0) details.push(`迟到${a.late}`);
+    if (a.sick > 0) details.push(`病假${a.sick}`);
+    if (a.personal > 0) details.push(`事假${a.personal}`);
+    if (a.home > 0) details.push(`长期居家${a.home}`);
+    if (a.amLeave > 0) details.push(`上午离校${a.amLeave}`);
+    if (a.pmLeave > 0) details.push(`下午离校${a.pmLeave}`);
+    detail += ' · ' + details.join('、');
+
+    return `<div class="alert-card ${a.level === 'high' ? '' : 'warn'}">
+      <div class="student-name">${a.name} ${badges.join('')}</div>
+      <div class="alert-detail">${detail}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('statsAlerts').innerHTML = html;
+}
+
+function renderStatsClassDetail(dates, byDate) {
+  let html = '<div style="overflow-x:auto"><table class="summary-table"><thead><tr>';
+  html += '<th>班级</th><th>应到(人天)</th><th>到校</th><th>迟到</th><th>病假</th><th>事假</th><th>长期居家</th><th>上午离校</th><th>下午离校</th><th>出勤率</th>';
+  html += '</tr></thead><tbody>';
+  state.classes.forEach(cls => {
+    const counts = { '到': 0, '迟到': 0, '病假': 0, '事假': 0, '长期居家': 0, '上午请假离校': 0, '下午请假离校': 0 };
+    let total = 0;
+    dates.forEach(d => {
+      const records = (byDate[d] && byDate[d][cls.id]) || {};
+      cls.students.forEach(s => {
+        total++;
+        const status = records[s.name] || s.defaultStatus || '到';
+        if (counts[status] !== undefined) counts[status]++;
+      });
+    });
+    const present = counts['到'] + counts['上午请假离校'] + counts['下午请假离校'];
+    const rate = total > 0 ? ((present / total) * 100).toFixed(1) : 0;
+    html += `<tr>`;
+    html += `<td style="font-weight:500">${cls.name}</td>`;
+    html += `<td>${total}</td>`;
+    html += `<td style="color:var(--green);font-weight:700">${present}</td>`;
+    html += `<td style="color:var(--red)">${counts['迟到']}</td>`;
+    html += `<td style="color:var(--orange)">${counts['病假']}</td>`;
+    html += `<td style="color:var(--yellow)">${counts['事假']}</td>`;
+    html += `<td style="color:var(--gray)">${counts['长期居家']}</td>`;
+    html += `<td style="color:#08979c">${counts['上午请假离校']}</td>`;
+    html += `<td style="color:#722ed1">${counts['下午请假离校']}</td>`;
+    html += `<td style="font-weight:700;color:${parseFloat(rate) >= 95 ? 'var(--green)' : (parseFloat(rate) >= 85 ? 'var(--orange)' : 'var(--red)')}">${rate}%</td>`;
+    html += `</tr>`;
+  });
+  // Total row
+  let grandTotal = 0, grandPresent = 0;
+  state.classes.forEach(cls => {
+    dates.forEach(d => {
+      const records = (byDate[d] && byDate[d][cls.id]) || {};
+      cls.students.forEach(s => {
+        grandTotal++;
+        const status = records[s.name] || s.defaultStatus || '到';
+        if (status === '到' || status === '上午请假离校' || status === '下午请假离校') grandPresent++;
+      });
+    });
+  });
+  const grandRate = grandTotal > 0 ? ((grandPresent / grandTotal) * 100).toFixed(1) : 0;
+  html += `<tr class="total-row"><td>合计</td><td>${grandTotal}</td><td>${grandPresent}</td>`;
+  html += `<td colspan="7" style="text-align:right;font-size:16px">总出勤率：${grandRate}%</td></tr>`;
+  html += '</tbody></table></div>';
+  document.getElementById('statsClassDetail').innerHTML = html;
+}
+
+function exportStats() {
+  if (!statsData) { showToast('请先加载数据', 'error'); return; }
+  const { dates, byDate } = statsData;
+  let csv = '\uFEFF';
+  csv += `考勤统计分析 - ${formatDateCN(statsData.start)} 至 ${formatDateCN(statsData.end)}\n`;
+  csv += `统计天数：${dates.length}\n\n`;
+
+  // Per class summary
+  csv += '=== 各班汇总 ===\n\n';
+  csv += '班级,应到(人天),到校,迟到,病假,事假,长期居家,上午离校,下午离校,出勤率\n';
+  state.classes.forEach(cls => {
+    const counts = { '到': 0, '迟到': 0, '病假': 0, '事假': 0, '长期居家': 0, '上午请假离校': 0, '下午请假离校': 0 };
+    let total = 0;
+    dates.forEach(d => {
+      const records = (byDate[d] && byDate[d][cls.id]) || {};
+      cls.students.forEach(s => {
+        total++;
+        const status = records[s.name] || s.defaultStatus || '到';
+        if (counts[status] !== undefined) counts[status]++;
+      });
+    });
+    const present = counts['到'] + counts['上午请假离校'] + counts['下午请假离校'];
+    const rate = total > 0 ? ((present / total) * 100).toFixed(1) : 0;
+    csv += `${cls.name},${total},${present},${counts['迟到']},${counts['病假']},${counts['事假']},${counts['长期居家']},${counts['上午请假离校']},${counts['下午请假离校']},${rate}%\n`;
+  });
+
+  // Per student detail
+  csv += '\n=== 学生个人统计 ===\n\n';
+  csv += '班级,序号,姓名,性别,统计天数,到校,迟到,病假,事假,长期居家,上午离校,下午离校,缺勤次数,异常总次,异常率\n';
+  state.classes.forEach(cls => {
+    const studentStats = calcStudentStats(dates, byDate, cls);
+    Object.values(studentStats).forEach(st => {
+      const absentCount = st.sick + st.personal + st.home + st.absent;
+      const totalAbnormal = absentCount + st.late + st.amLeave + st.pmLeave;
+      const rate = st.totalDays > 0 ? ((totalAbnormal / st.totalDays) * 100).toFixed(1) : 0;
+      csv += `${cls.name},${st.seq || ''},${st.name},${st.gender || ''},${st.totalDays},${st.present},${st.late},${st.sick},${st.personal},${st.home},${st.amLeave},${st.pmLeave},${absentCount},${totalAbnormal},${rate}%\n`;
+    });
+  });
+
+  // Alert students
+  csv += '\n=== 重点关注学生 ===\n\n';
+  csv += '班级,姓名,缺勤次数,迟到次数,病假次数,事假次数,长期居家天数,异常率,关注等级\n';
+  state.classes.forEach(cls => {
+    const studentStats = calcStudentStats(dates, byDate, cls);
+    Object.values(studentStats).forEach(st => {
+      const absentCount = st.sick + st.personal + st.home + st.absent;
+      const totalAbnormal = absentCount + st.late + st.amLeave + st.pmLeave;
+      const absentRate = st.totalDays > 0 ? (absentCount / st.totalDays) * 100 : 0;
+      if (absentRate >= 20 || totalAbnormal >= st.totalDays * 0.3 || absentCount >= 3 || st.late >= 3) {
+        const level = absentRate >= 30 || totalAbnormal >= st.totalDays * 0.5 ? '高' : '中';
+        csv += `${cls.name},${st.name},${absentCount},${st.late},${st.sick},${st.personal},${st.home},${(absentRate).toFixed(0)}%,${level}\n`;
+      }
+    });
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `考勤统计_${statsData.start}_${statsData.end}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('统计已导出', 'success');
+}
+
+
+// ============================================
+// Initialization
+// ============================================
+async function init() {
+  const config = loadConfig();
+
+  if (!config.url || !config.key) {
+    // Show config screen
+    document.getElementById('configScreen').classList.remove('screen-hidden');
+    return;
+  }
+
+  // Initialize Supabase
+  try {
+    if (typeof supabase === 'undefined') {
+      throw new Error('Supabase 库加载失败，请检查网络');
+    }
+    sb = supabase.createClient(config.url, config.key);
+    await loadData();
+
+    // Check for saved role
+    const lastRole = localStorage.getItem(LAST_ROLE_KEY);
+    const lastClass = localStorage.getItem(LAST_CLASS_KEY);
+
+    if (lastRole === 'admin') {
+      state.role = 'admin';
+      if (state.classes.length > 0) state.currentClassId = state.classes[0].id;
+      showMainApp();
+    } else if (lastRole === 'teacher' && lastClass && state.classes.find(c => c.id === lastClass)) {
+      state.role = 'teacher';
+      state.currentClassId = lastClass;
+      await applyDefaultStatus(lastClass, todayStr());
+      showMainApp();
+    } else {
+      showLoginScreen();
+      selectRole('teacher');
+    }
+  } catch (err) {
+    hideLoading();
+    showToast('初始化失败：' + err.message, 'error');
+    // Show config screen for re-configuration
+    document.getElementById('configScreen').classList.remove('screen-hidden');
+    document.getElementById('sbUrl').value = config.url || '';
+    document.getElementById('sbKey').value = config.key || '';
+    document.getElementById('configStatus').innerHTML =
+      '<span style="color:var(--red)">连接失败，请检查配置：' + err.message + '</span>';
+  }
+}
+
+init();
+</script>
+</body>
+</html>
