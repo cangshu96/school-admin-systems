@@ -400,12 +400,20 @@ body { -webkit-tap-highlight-color: transparent; }
 .student-cell .gender { width: 24px; height: 24px; line-height: 24px; font-size: 12px; flex-shrink: 0; }
 .student-cell .status-tag { margin-left: auto; font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
 @media (max-width: 768px) {
-  .student-list { grid-template-columns: repeat(2, 1fr); }
+  .student-list { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  /* 手机端卡片两行布局：第一行 序号+姓名+性别，第二行 状态标签整行，保证不溢出 */
+  .student-cell { flex-wrap: wrap; padding: 8px; gap: 3px 6px; }
+  .student-cell .num { font-size: 13px; min-width: 18px; }
+  .student-cell .class-col { font-size: 12px; min-width: 30px; }
+  .student-cell .name { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .student-cell .gender { width: 22px; height: 22px; line-height: 22px; font-size: 11px; }
+  .student-cell .status-tag { flex-basis: 100%; margin-left: 0; width: 100%; box-sizing: border-box; font-size: 11px; padding: 2px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
-@media (max-width: 640px) {
-  .student-cell { padding: 9px 10px; gap: 5px; }
-  .student-cell .name { font-size: 15px; }
-  .student-cell .status-tag { padding: 3px 6px; font-size: 11px; }
+@media (max-width: 380px) {
+  .student-list { gap: 5px; }
+  .student-cell { padding: 7px 6px; }
+  .student-cell .num { min-width: 16px; font-size: 12px; }
+  .student-cell .gender { width: 20px; height: 20px; line-height: 20px; font-size: 10px; }
 }
 </style>
 </head>
@@ -574,7 +582,7 @@ ON CONFLICT (id) DO NOTHING;</div>
 <div id="mainApp" class="screen screen-hidden">
   <div class="header">
     <div class="header-inner">
-      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.6.0</span></h1>
+      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.6.1</span></h1>
       <div class="header-info">
         <span class="header-date" id="headerDate"></span>
         <span class="header-role" id="headerRole"></span>
