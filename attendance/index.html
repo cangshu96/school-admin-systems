@@ -574,7 +574,7 @@ ON CONFLICT (id) DO NOTHING;</div>
 <div id="mainApp" class="screen screen-hidden">
   <div class="header">
     <div class="header-inner">
-      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.5.1</span></h1>
+      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.6.0</span></h1>
       <div class="header-info">
         <span class="header-date" id="headerDate"></span>
         <span class="header-role" id="headerRole"></span>
@@ -686,6 +686,8 @@ ON CONFLICT (id) DO NOTHING;</div>
         <div class="notice">💡 在这里添加/修改班级和学生名单。修改后所有班主任端同步更新。</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px">
           <button class="btn btn-primary btn-sm" onclick="addClass()">+ 添加班级</button>
+          <button class="btn btn-outline btn-sm" onclick="exportClassStudentsTemplate()">📥 导出Excel模板</button>
+          <label class="btn btn-outline btn-sm" style="cursor:pointer">📤 导入Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importClassStudents(this)"></label>
         </div>
       </div>
       <div id="settingsList"></div>
@@ -1545,6 +1547,102 @@ async function replaceClassRecord(cls) {
     name: cls.name, students: cls.students
   }).eq('id', cls.id);
   if (error) throw error;
+}
+
+
+// ============================================
+// 班级学生 Excel 批量导入导出
+// ============================================
+async function exportClassStudentsTemplate() {
+  await loadLib('xlsx').catch(e => { showToast(e.message, 'error'); return; });
+  showLoading('正在生成模板...');
+  const rows = [];
+  state.classes.forEach(cls => {
+    if (cls.students.length === 0) {
+      rows.push({ '班级名称': cls.name, '学生序号': '', '学生姓名': '', '性别': '', '默认状态': '到' });
+    }
+    cls.students.forEach((st, i) => {
+      rows.push({
+        '班级名称': cls.name,
+        '学生序号': st.seq || i + 1,
+        '学生姓名': st.name,
+        '性别': st.gender || '',
+        '默认状态': st.defaultStatus || '到'
+      });
+    });
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 8 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '班级学生');
+  XLSX.writeFile(wb, '班级学生导入模板.xlsx');
+  hideLoading();
+  showToast('模板已导出', 'success');
+}
+
+async function importClassStudents(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    await loadLib('xlsx').catch(e => { throw new Error('Excel组件加载失败'); });
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws);
+    if (rows.length === 0) { showToast('Excel中没有数据', 'error'); input.value = ''; return; }
+    // 按班级名称分组解析
+    const groups = {};
+    rows.forEach(r => {
+      const clsName = String(r['班级名称'] || '').trim();
+      if (!clsName) return;
+      const name = String(r['学生姓名'] || '').trim();
+      if (!name) return;
+      if (!groups[clsName]) groups[clsName] = [];
+      const seq = parseInt(r['学生序号']);
+      const st = String(r['默认状态'] || '').trim();
+      groups[clsName].push({
+        seq: seq > 0 ? seq : groups[clsName].length + 1,
+        name: name,
+        gender: String(r['性别'] || '').trim(),
+        defaultStatus: STATUS_LIST.includes(st) ? st : '到'
+      });
+    });
+    const classNames = Object.keys(groups);
+    if (classNames.length === 0) { showToast('未识别到有效数据（需包含班级名称和学生姓名）', 'error'); input.value = ''; return; }
+    // 覆盖确认（自定义弹层，兼容QQ内嵌浏览器）
+    showConfirm('导入将覆盖同名班级的学生名单，并新建不存在的班级，确定继续吗？', async function() {
+      showLoading('正在导入...');
+      try {
+        let updated = 0, created = 0;
+        for (const clsName of classNames) {
+          const students = groups[clsName];
+          const existing = state.classes.find(c => c.name === clsName);
+          if (existing) {
+            const { error } = await sb.from('classes').update({ students: students }).eq('id', existing.id);
+            if (error) throw error;
+            updated++;
+          } else {
+            const id = 'c' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            const maxSort = state.classes.length > 0 ? Math.max(...state.classes.map(c => c.sort_order || 0)) : -1;
+            const { error } = await sb.from('classes').insert({ id: id, name: clsName, students: students, sort_order: maxSort + 1 });
+            if (error) throw error;
+            created++;
+          }
+        }
+        await loadClasses();
+        renderSettings();
+        renderClassSelector();
+        hideLoading();
+        showToast('导入完成：更新 ' + updated + ' 个班级，新建 ' + created + ' 个班级', 'success');
+      } catch (err) {
+        hideLoading();
+        showToast('导入失败：' + err.message, 'error');
+      }
+    });
+  } catch (err) {
+    showToast('导入失败：' + err.message, 'error');
+  }
+  input.value = '';
 }
 
 function renderSettings() {
