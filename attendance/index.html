@@ -210,7 +210,7 @@ body {
 .status-chip .count { font-size: 17px; font-weight: 700; }
 
 /* ===== Student List ===== */
-.student-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 10px; }
+.student-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .student-row {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: #fff;
   border: 1px solid var(--border); border-radius: 10px; transition: all 0.15s;
@@ -304,7 +304,7 @@ body {
 @media (max-width: 640px) {
   .header h1 { font-size: 17px; }
   .header-info { font-size: 12px; gap: 8px; }
-  .student-list { grid-template-columns: 1fr; }
+  .student-list { grid-template-columns: repeat(2, 1fr); }
   .tab-btn { padding: 11px 6px; font-size: 13px; }
   .summary-table { font-size: 12px; }
   .summary-table th, .summary-table td { padding: 6px 3px; }
@@ -385,6 +385,21 @@ body { -webkit-tap-highlight-color: transparent; }
   .student-row { flex-wrap: nowrap; }
   .student-row .status-tag { padding: 3px 8px; font-size: 12px; }
   .student-expand .status-btn { min-width: 88px; }
+}
+
+/* ===== 学生网格卡片 ===== */
+.student-cell { display: flex; align-items: center; gap: 6px; padding: 10px 12px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; transition: box-shadow 0.2s, transform 0.1s; }
+.student-cell:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.student-cell:active { transform: scale(.97); }
+.student-cell .num { font-size: 14px; color: var(--text2); min-width: 20px; text-align: center; font-weight: 600; }
+.student-cell .class-col { font-size: 13px; color: var(--primary); min-width: 34px; font-weight: 600; }
+.student-cell .name { font-size: 16px; font-weight: 600; min-width: 0; }
+.student-cell .gender { width: 24px; height: 24px; line-height: 24px; font-size: 12px; flex-shrink: 0; }
+.student-cell .status-tag { margin-left: auto; font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+@media (max-width: 640px) {
+  .student-cell { padding: 9px 10px; gap: 5px; }
+  .student-cell .name { font-size: 15px; }
+  .student-cell .status-tag { padding: 3px 6px; font-size: 11px; }
 }
 </style>
 </head>
@@ -553,7 +568,7 @@ ON CONFLICT (id) DO NOTHING;</div>
 <div id="mainApp" class="screen screen-hidden">
   <div class="header">
     <div class="header-inner">
-      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.4.0</span></h1>
+      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.5.0</span></h1>
       <div class="header-info">
         <span class="header-date" id="headerDate"></span>
         <span class="header-role" id="headerRole"></span>
@@ -1086,9 +1101,44 @@ function selectClass(classId) {
   renderClassSelector();
 }
 
-function toggleExpand(studentName) {
-  state.expandedStudent = (state.expandedStudent === studentName) ? null : studentName;
-  renderStudentList();
+// 通用确认弹层（兼容 QQ 等内嵌浏览器，不使用原生 confirm）
+let _confirmCb = null;
+function showConfirm(title, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  _confirmCb = cb;
+  document.getElementById('confirmOverlay').style.display = 'flex';
+}
+function cancelConfirm() {
+  _confirmCb = null;
+  document.getElementById('confirmOverlay').style.display = 'none';
+}
+function doConfirm() {
+  const cb = _confirmCb;
+  _confirmCb = null;
+  document.getElementById('confirmOverlay').style.display = 'none';
+  if (cb) cb();
+}
+
+// 学生状态选择弹层
+function openStatusPicker(studentName) {
+  const cls = state.classes.find(c => c.id === state.currentClassId);
+  if (!cls) return;
+  const records = state.attendanceCache[state.currentClassId] || {};
+  const s = cls.students.find(x => x.name === studentName);
+  if (!s) return;
+  const status = records[s.name] || s.defaultStatus || '到';
+  document.getElementById('statusPickerTitle').textContent = '选择状态 · ' + s.name;
+  document.getElementById('statusPickerBtns').innerHTML = STATUS_LIST.map(st =>
+    `<button class="status-btn ${st === status ? 'active' : ''}" onclick="pickStatus('${s.name.replace(/'/g,"\\'")}','${st}')">${st}</button>`
+  ).join('');
+  document.getElementById('statusOverlay').style.display = 'flex';
+}
+function pickStatus(studentName, status) {
+  closeStatusPicker();
+  setStatus(studentName, status);
+}
+function closeStatusPicker() {
+  document.getElementById('statusOverlay').style.display = 'none';
 }
 
 async function renderStudentList() {
@@ -1122,27 +1172,21 @@ async function renderStudentList() {
 
   document.getElementById('quickActions').style.display = state.viewDate === todayStr() ? '' : 'none';
 
-  // 紧凑表格：一行一个学生，点击展开状态按钮
+  // 网格卡片：每行多列，点击弹出状态选择
   const html = cls.students.map((s, i) => {
     const status = records[s.name] || s.defaultStatus || '到';
-    const escName = s.name.replace(/'/g,"\\'");
+    const escName = s.name.replace(/'/g,"\'");
     const genderClass = s.gender === '男' ? 'male' : (s.gender === '女' ? 'female' : '');
-    const isOpen = state.expandedStudent === s.name;
-    let row = `<div class="student-row${isOpen ? ' expanded' : ''}" onclick="toggleExpand('${escName}')">`;
+    let cell = `<div class="student-cell" onclick="openStatusPicker('${escName}')">`;
     if (state.role === 'admin') {
-      row += `<span class="class-col">${cls.name}</span>`;
+      cell += `<span class="class-col">${cls.name}</span>`;
     }
-    row += `<span class="num">${s.seq || i+1}</span>`;
-    row += `<span class="name">${s.name}</span>`;
-    row += `<span class="gender ${genderClass}">${s.gender || ''}</span>`;
-    row += `<span class="status-tag" style="color:${STATUS_COLORS[status]};background:${STATUS_BG[status]}">${status}</span>`;
-    row += `<span class="expand-arrow">▾</span>`;
-    row += `</div>`;
-    const btns = STATUS_LIST.map(st =>
-      `<button class="status-btn ${st === status ? 'active' : ''}" data-s="${st}" onclick="setStatus('${escName}','${st}')">${st}</button>`
-    ).join('');
-    row += `<div class="student-expand${isOpen ? ' open' : ''}">${btns}</div>`;
-    return row;
+    cell += `<span class="num">${s.seq || i+1}</span>`;
+    cell += `<span class="name">${s.name}</span>`;
+    cell += `<span class="gender ${genderClass}">${s.gender || ''}</span>`;
+    cell += `<span class="status-tag" style="color:${STATUS_COLORS[status]};background:${STATUS_BG[status]}">${status}</span>`;
+    cell += `</div>`;
+    return cell;
   }).join('');
   document.getElementById('studentList').innerHTML = html;
 
@@ -1192,7 +1236,7 @@ async function setStatus(studentName, status) {
 }
 
 async function resetAllToPresent() {
-  if (!confirm('确定将所有学生标记为「到」吗？')) return;
+  showConfirm('确定将所有学生标记为「到」吗？', async function() {
   const classId = state.currentClassId;
   const clsR = state.classes.find(c => c.id === classId);
   const resetRecords = {};
@@ -1214,6 +1258,7 @@ async function resetAllToPresent() {
     showToast('操作失败：' + err.message, 'error');
   }
   renderStudentList();
+  });
 }
 
 // ============================================
@@ -1561,7 +1606,7 @@ async function addClass() {
 }
 
 async function deleteClass(id) {
-  if (!confirm('确定删除该班级吗？相关考勤数据也将删除。')) return;
+  showConfirm('确定删除该班级吗？相关考勤数据也将删除。', async function() {
   try {
     const { error } = await sb.from('classes').delete().eq('id', id);
     if (error) throw error;
@@ -1572,6 +1617,7 @@ async function deleteClass(id) {
   } catch (err) {
     showToast('删除失败：' + err.message, 'error');
   }
+  });
 }
 
 async function updateClassName(id, name) {
@@ -2304,5 +2350,23 @@ async function init() {
 init();
 </script>
 <script>window.addEventListener('load',function(){var el=document.getElementById('app-loading');if(el){el.style.opacity='0';setTimeout(function(){el.remove()},300)}});</script>
+<!-- 通用确认弹层（QQ/微信内嵌浏览器兼容，不使用原生 confirm） -->
+<div id="confirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px" onclick="cancelConfirm()">
+  <div style="background:#fff;border-radius:14px;padding:22px;width:100%;max-width:320px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.2)" onclick="event.stopPropagation()">
+    <div id="confirmTitle" style="font-size:16px;font-weight:600;margin-bottom:14px;line-height:1.5">确定执行此操作吗？</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-outline" style="flex:1" onclick="cancelConfirm()">取消</button>
+      <button class="btn btn-primary" style="flex:1" onclick="doConfirm()">确定</button>
+    </div>
+  </div>
+</div>
+<!-- 学生状态选择弹层 -->
+<div id="statusOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;align-items:center;justify-content:center;padding:20px" onclick="closeStatusPicker()">
+  <div style="background:#fff;border-radius:14px;padding:20px;width:100%;max-width:380px;box-shadow:0 8px 30px rgba(0,0,0,.2)" onclick="event.stopPropagation()">
+    <div id="statusPickerTitle" style="font-size:16px;font-weight:600;margin-bottom:12px">选择状态</div>
+    <div id="statusPickerBtns" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    <button class="btn btn-outline" style="width:100%;margin-top:14px" onclick="closeStatusPicker()">取消</button>
+  </div>
+</div>
 </body>
 </html>
