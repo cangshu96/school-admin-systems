@@ -369,6 +369,23 @@ body { -webkit-tap-highlight-color: transparent; }
   .summary-table th, .summary-table td { padding: 8px 4px; }
 }
 
+
+/* ===== 紧凑学生表格：点击行展开状态 ===== */
+.student-row { flex-wrap: nowrap; cursor: pointer; transition: background 0.2s; }
+.student-row:hover { box-shadow: none; }
+.student-row:active { background: #f5f7fa; }
+.student-row.expanded { background: #f5f7fa; }
+.student-row .status-tag { margin-left: auto; font-size: 13px; padding: 4px 12px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+.student-row .expand-arrow { margin-left: 10px; font-size: 13px; color: var(--text2); transition: transform 0.2s; }
+.student-row.expanded .expand-arrow { transform: rotate(180deg); }
+.student-expand { display: none; }
+.student-expand.open { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 14px 14px; background: #fafbfc; border-top: 1px dashed var(--border); }
+.student-expand .status-btn { flex: 1 1 auto; min-width: 92px; justify-content: center; }
+@media (max-width: 640px) {
+  .student-row { flex-wrap: nowrap; }
+  .student-row .status-tag { padding: 3px 8px; font-size: 12px; }
+  .student-expand .status-btn { min-width: 88px; }
+}
 </style>
 </head>
 <body>
@@ -536,7 +553,7 @@ ON CONFLICT (id) DO NOTHING;</div>
 <div id="mainApp" class="screen screen-hidden">
   <div class="header">
     <div class="header-inner">
-      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.3.2</span></h1>
+      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.4.0</span></h1>
       <div class="header-info">
         <span class="header-date" id="headerDate"></span>
         <span class="header-role" id="headerRole"></span>
@@ -689,7 +706,8 @@ let state = {
   role: null,             // 'teacher' | 'admin'
   currentClassId: null,
   viewDate: todayStr(),
-  attendanceCache: {}    // { classId: { studentName: status } }
+  attendanceCache: {},   // { classId: { studentName: status } }
+  expandedStudent: null  // 当前展开的学生姓名
 };
 let selectedRole = 'teacher';
 
@@ -1068,6 +1086,11 @@ function selectClass(classId) {
   renderClassSelector();
 }
 
+function toggleExpand(studentName) {
+  state.expandedStudent = (state.expandedStudent === studentName) ? null : studentName;
+  renderStudentList();
+}
+
 async function renderStudentList() {
   const cls = state.classes.find(c => c.id === state.currentClassId);
   if (!cls) return;
@@ -1099,26 +1122,32 @@ async function renderStudentList() {
 
   document.getElementById('quickActions').style.display = state.viewDate === todayStr() ? '' : 'none';
 
+  // 紧凑表格：一行一个学生，点击展开状态按钮
   const html = cls.students.map((s, i) => {
     const status = records[s.name] || s.defaultStatus || '到';
-    const btns = STATUS_LIST.map(st =>
-      `<button class="status-btn ${st === status ? 'active' : ''}" data-s="${st}" onclick="setStatus('${s.name.replace(/'/g,"\\'")}','${st}')">${st}</button>`
-    ).join('');
-    let row = `<div class="student-row">`;
+    const escName = s.name.replace(/'/g,"\\'");
+    const genderClass = s.gender === '男' ? 'male' : (s.gender === '女' ? 'female' : '');
+    const isOpen = state.expandedStudent === s.name;
+    let row = `<div class="student-row${isOpen ? ' expanded' : ''}" onclick="toggleExpand('${escName}')">`;
     if (state.role === 'admin') {
       row += `<span class="class-col">${cls.name}</span>`;
     }
-    const genderClass = s.gender === '男' ? 'male' : (s.gender === '女' ? 'female' : '');
     row += `<span class="num">${s.seq || i+1}</span>`;
     row += `<span class="name">${s.name}</span>`;
     row += `<span class="gender ${genderClass}">${s.gender || ''}</span>`;
-    row += `<div class="status-btns">${btns}</div>`;
+    row += `<span class="status-tag" style="color:${STATUS_COLORS[status]};background:${STATUS_BG[status]}">${status}</span>`;
+    row += `<span class="expand-arrow">▾</span>`;
     row += `</div>`;
+    const btns = STATUS_LIST.map(st =>
+      `<button class="status-btn ${st === status ? 'active' : ''}" data-s="${st}" onclick="setStatus('${escName}','${st}')">${st}</button>`
+    ).join('');
+    row += `<div class="student-expand${isOpen ? ' open' : ''}">${btns}</div>`;
     return row;
   }).join('');
   document.getElementById('studentList').innerHTML = html;
 
   renderStatusBar(cls, records);
+
 }
 
 function renderStatusBar(cls, records) {
@@ -1156,29 +1185,8 @@ async function setStatus(studentName, status) {
     records[studentName] = status;
   }
 
-  // Re-render immediately
-  const cls = state.classes.find(c => c.id === classId);
-  if (cls) {
-    const html = cls.students.map((s, i) => {
-      const st = records[s.name] || s.defaultStatus || '到';
-      const btns = STATUS_LIST.map(st2 =>
-        `<button class="status-btn ${st2 === st ? 'active' : ''}" data-s="${st2}" onclick="setStatus('${s.name.replace(/'/g,"\\'")}','${st2}')">${st2}</button>`
-      ).join('');
-      let row = `<div class="student-row">`;
-      if (state.role === 'admin') {
-        row += `<span class="class-col">${cls.name}</span>`;
-      }
-      const genderClass = s.gender === '男' ? 'male' : (s.gender === '女' ? 'female' : '');
-      row += `<span class="num">${s.seq || i+1}</span>`;
-      row += `<span class="name">${s.name}</span>`;
-      row += `<span class="gender ${genderClass}">${s.gender || ''}</span>`;
-      row += `<div class="status-btns">${btns}</div>`;
-      row += `</div>`;
-      return row;
-    }).join('');
-    document.getElementById('studentList').innerHTML = html;
-    renderStatusBar(cls, records);
-  }
+  // Re-render immediately (保持展开状态)
+  renderStudentList();
 
   scheduleAttendanceSave(state.viewDate, classId);
 }
