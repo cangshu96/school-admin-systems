@@ -12,6 +12,9 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>级部考勤系统 - 云端版</title>
 <script src="https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js"></script>
 
@@ -396,6 +399,9 @@ body { -webkit-tap-highlight-color: transparent; }
 .student-cell .name { font-size: 16px; font-weight: 600; min-width: 0; }
 .student-cell .gender { width: 24px; height: 24px; line-height: 24px; font-size: 12px; flex-shrink: 0; }
 .student-cell .status-tag { margin-left: auto; font-size: 12px; padding: 3px 8px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+@media (max-width: 768px) {
+  .student-list { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 640px) {
   .student-cell { padding: 9px 10px; gap: 5px; }
   .student-cell .name { font-size: 15px; }
@@ -568,7 +574,7 @@ ON CONFLICT (id) DO NOTHING;</div>
 <div id="mainApp" class="screen screen-hidden">
   <div class="header">
     <div class="header-inner">
-      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.5.0</span></h1>
+      <h1>📋 级部考勤 <span style="font-size:12px;font-weight:400;color:var(--text2)">v2.5.1</span></h1>
       <div class="header-info">
         <span class="header-date" id="headerDate"></span>
         <span class="header-role" id="headerRole"></span>
