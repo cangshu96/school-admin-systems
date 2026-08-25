@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.8.3</title>
+<title>巡课汇总反馈系统 v2.8.4</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -207,6 +207,8 @@ body {
 .special-badge.开会 { background: var(--purple-bg); color: var(--purple); }
 .special-badge.学生自习 { background: var(--teal-bg); color: var(--teal); }
 .special-badge.室外体育课 { background: var(--orange-bg); color: var(--orange); }
+.duty-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; margin-left: 8px; color: var(--text2); background: #f5f7fa; border: 1px solid var(--border); cursor: pointer; transition: all .15s; }
+.duty-tag.active { background: var(--primary-bg); color: var(--primary); border-color: var(--primary); font-weight: 600; }
 
 .card-bottom {
   display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; flex-wrap: wrap;
@@ -444,7 +446,7 @@ body { font-size: 16px; line-height: 1.5; }
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.8.3</div>
+    <div class="version">v2.8.4</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
     <div class="form-group">
       <label>级部</label>
@@ -488,7 +490,7 @@ body { font-size: 16px; line-height: 1.5; }
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.8.3</span></h1>
+    <h1>📋 巡课汇总 <span class="ver">v2.8.4</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -1186,6 +1188,7 @@ function renderClassCard(cls, rec, subject, teacher, photos) {
     html += '<option value="' + opt.value + '"' + (special === opt.value ? ' selected' : '') + '>' + opt.label + '</option>';
   });
   html += '</select>';
+  html += '<span class="duty-tag' + (rec.scores && rec.scores['_banzhuren'] ? ' active' : '') + '" onclick="toggleDuty(\'' + cid + '\',' + period + ')">👨‍🏫 班主任坐班</span>';
 
   // Photo thumbnails with delete button
   if (photos.length > 0) {
@@ -1281,6 +1284,20 @@ function toggleReasonTag(classId, period, item, tag) {
   rec.reasons[item] = reasons.join('、');
   schedulePatrolSave(state.viewDate, classId, period);
   renderPatrol();
+}
+
+function toggleDuty(classId, period) {
+  const key = classId + '_' + period;
+  if (!state.records[key]) state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+  const rec = state.records[key];
+  if (!rec.scores) rec.scores = {};
+  if (rec.scores['_banzhuren']) {
+    delete rec.scores['_banzhuren'];
+  } else {
+    rec.scores['_banzhuren'] = '1';
+  }
+  schedulePatrolSave(state.viewDate, classId, period);
+  renderPatrolCard(classId, period);
 }
 
 async function setSpecial(classId, period, special) {
