@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.7.2</title>
+<title>巡课汇总反馈系统 v2.8.0</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -351,6 +351,13 @@ body { -webkit-tap-highlight-color: transparent; }
   .grade-btn { font-size: 14px; }
   .photo-btn { padding: 8px 12px; }
 }
+/* ===== 级部分组统计 ===== */
+.dept-stats { background: #fff; border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; }
+.dept-stats.dept-total { border: 2px solid var(--primary); }
+.dept-label { font-weight: 600; font-size: 14px; color: var(--primary-dark); margin-bottom: 8px; }
+.dept-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.dept-cards .stat-card { min-width: 70px; padding: 6px 10px; }
+.dept-badge { display: inline-block; font-size: 10px; color: #fff; background: var(--primary); border-radius: 8px; padding: 1px 6px; margin-right: 4px; vertical-align: middle; }
 </style>
 </head>
 <body>
@@ -367,8 +374,16 @@ body { -webkit-tap-highlight-color: transparent; }
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.7.2</div>
+    <div class="version">v2.8.0</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
+    <div class="form-group">
+      <label>级部</label>
+      <select id="loginDept" onchange="updateTeacherList()">
+        <option value="">请选择级部</option>
+        <option value="一级部">一级部（701-707）</option>
+        <option value="二级部">二级部（708-713）</option>
+      </select>
+    </div>
     <div class="form-group">
       <label>备课组</label>
       <select id="loginGroup" onchange="updateTeacherList()">
@@ -403,7 +418,7 @@ body { -webkit-tap-highlight-color: transparent; }
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.7.2</span></h1>
+    <h1>📋 巡课汇总 <span class="ver">v2.8.0</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -663,6 +678,7 @@ const state = {
   role: null,
   teacher: null,
   group: null,
+  dept: null,
   currentSettingsTab: 'classes',
   autoRefreshTimer: null,
   summaryDate: todayStr(),
@@ -882,16 +898,18 @@ function updateTeacherList() {
   }
 }
 function doLogin() {
+  const dept = document.getElementById('loginDept').value;
   const groupId = document.getElementById('loginGroup').value;
   const teacherId = document.getElementById('loginTeacher').value;
   const teacherName = document.getElementById('loginTeacher').selectedOptions[0]?.text || '';
-  if (!groupId || !teacherId) {
-    showToast('请选择备课组和教师', 'error');
+  if (!dept || !groupId || !teacherId) {
+    showToast('请选择级部、备课组和教师', 'error');
     return;
   }
   state.role = 'teacher';
   state.teacher = teacherName;
   state.group = groupId;
+  state.dept = dept;
   localStorage.setItem(LAST_GROUP_KEY, groupId);
   localStorage.setItem(LAST_TEACHER_KEY, teacherId);
   showMainApp();
@@ -912,7 +930,7 @@ function showMainApp() {
   document.getElementById('loginScreen').classList.add('screen-hidden');
   document.getElementById('adminLoginScreen').classList.add('screen-hidden');
   document.getElementById('mainApp').classList.remove('screen-hidden');
-  document.getElementById('headerUser').textContent = state.teacher;
+  document.getElementById('headerUser').textContent = state.role === 'admin' ? state.teacher : state.dept + ' · ' + state.teacher;
   document.getElementById('headerDate').textContent = formatDateCN(state.viewDate) + ' 周' + getWeekday(state.viewDate);
   const patrolDateInput = document.getElementById('patrolDate');
   if (patrolDateInput) { patrolDateInput.value = state.viewDate; patrolDateInput.max = todayStr(); }
@@ -960,17 +978,34 @@ function onPeriodChange() {
 }
 
 // ============================================
+// 级部判断与过滤
+// ============================================
+// 级部规则：701-707 一级部，708-713 二级部
+function deptOfClass(name) {
+  const n = parseInt(name);
+  if (n >= 708) return '二级部';
+  return '一级部';
+}
+function visibleClasses() {
+  if (state.role === 'admin') return state.classes;
+  return state.classes.filter(c => deptOfClass(c.name) === state.dept);
+}
+function currentDeptLabel() {
+  return state.role === 'admin' ? '两级部' : state.dept;
+}
+
+// ============================================
 // 巡课渲染
 // ============================================
 async function renderPatrol() {
   const container = document.getElementById('patrolList');
   const progressEl = document.getElementById('patrolProgress');
-  if (state.classes.length === 0) {
+  if (visibleClasses().length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="text">暂无班级</div><div class="hint">请在「设置」中添加班级</div></div>';
     return;
   }
   // Render cards
-  container.innerHTML = state.classes.map(cls => {
+  container.innerHTML = visibleClasses().map(cls => {
     const key = cls.id + '_' + state.currentPeriod;
     const rec = state.records[key] || { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
     const sched = getSchedule(cls.id, state.currentPeriod);
@@ -1158,7 +1193,7 @@ function showSaveStatus(classId, period, status) {
 // ============================================
 async function resetAllToA() {
   if (!confirm('确定将所有班级标记为A吗？')) return;
-  for (const cls of state.classes) {
+  for (const cls of visibleClasses()) {
     const key = cls.id + '_' + state.currentPeriod;
     state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false, inspector: state.teacher };
     try {
@@ -1312,33 +1347,59 @@ async function renderSummary() {
 
   try {
     await loadPatrolRecords(state.summaryDate);
-    // Render stats
-    let totalChecked = 0, totalItems = 0, aCount = 0, bCount = 0, cCount = 0, specialCount = 0;
-    state.classes.forEach(cls => {
-      state.periods.forEach(p => {
-        const key = cls.id + '_' + p.period;
-        const rec = state.records[key];
-        if (rec) {
-          totalChecked++;
-          if (rec.special) { specialCount++; return; }
-          SCORE_ITEMS.forEach(item => {
-            totalItems++;
-            const grade = rec.scores[item] || 'A';
-            if (grade === 'A') aCount++;
-            else if (grade === 'B') bCount++;
-            else if (grade === 'C') cCount++;
-          });
-        }
+    // Render stats（按级部分组统计）
+    const visCls = visibleClasses();
+    const deptList = state.role === 'admin' ? ['一级部', '二级部'] : [state.dept];
+    let statsHtml = '';
+    let gTotal = 0, gA = 0, gB = 0, gC = 0, gSp = 0;
+    deptList.forEach(d => {
+      const dcls = visCls.filter(c => deptOfClass(c.name) === d);
+      let totalChecked = 0, totalItems = 0, a = 0, b = 0, c = 0, special = 0;
+      dcls.forEach(cls => {
+        state.periods.forEach(p => {
+          const key = cls.id + '_' + p.period;
+          const rec = state.records[key];
+          if (rec) {
+            totalChecked++;
+            if (rec.special) { special++; return; }
+            SCORE_ITEMS.forEach(item => {
+              totalItems++;
+              const grade = rec.scores[item] || 'A';
+              if (grade === 'A') a++;
+              else if (grade === 'B') b++;
+              else if (grade === 'C') c++;
+            });
+          }
+        });
       });
+      gTotal += totalChecked; gA += a; gB += b; gC += c; gSp += special;
+      const unchecked = dcls.length * state.periods.length - totalChecked;
+      statsHtml += `<div class="dept-stats">
+        <div class="dept-label">${d}（${dcls.length}班）</div>
+        <div class="dept-cards">
+          <div class="stat-card"><div class="num" style="color:var(--primary)">${totalChecked}</div><div class="lbl">已巡课</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--green)">${a}</div><div class="lbl">A项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--orange)">${b}</div><div class="lbl">B项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--red)">${c}</div><div class="lbl">C项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--purple)">${special}</div><div class="lbl">特殊情况</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--text2)">${unchecked}</div><div class="lbl">未巡课</div></div>
+        </div>
+      </div>`;
     });
-    statsEl.innerHTML = `
-      <div class="stat-card"><div class="num" style="color:var(--primary)">${totalChecked}</div><div class="lbl">已巡课</div></div>
-      <div class="stat-card"><div class="num" style="color:var(--green)">${aCount}</div><div class="lbl">A项</div></div>
-      <div class="stat-card"><div class="num" style="color:var(--orange)">${bCount}</div><div class="lbl">B项</div></div>
-      <div class="stat-card"><div class="num" style="color:var(--red)">${cCount}</div><div class="lbl">C项</div></div>
-      <div class="stat-card"><div class="num" style="color:var(--purple)">${specialCount}</div><div class="lbl">特殊情况</div></div>
-      <div class="stat-card"><div class="num" style="color:var(--text2)">${state.classes.length * state.periods.length - totalChecked}</div><div class="lbl">未巡课</div></div>
-    `;
+    if (state.role === 'admin') {
+      statsHtml += `<div class="dept-stats dept-total">
+        <div class="dept-label">两级部合计（${visCls.length}班）</div>
+        <div class="dept-cards">
+          <div class="stat-card"><div class="num" style="color:var(--primary)">${gTotal}</div><div class="lbl">已巡课</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--green)">${gA}</div><div class="lbl">A项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--orange)">${gB}</div><div class="lbl">B项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--red)">${gC}</div><div class="lbl">C项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--purple)">${gSp}</div><div class="lbl">特殊情况</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--text2)">${visCls.length * state.periods.length - gTotal}</div><div class="lbl">未巡课</div></div>
+        </div>
+      </div>`;
+    }
+    statsEl.innerHTML = statsHtml;
 
     // Render grid
     let html = '<table class="summary-table"><thead><tr><th>班级</th>';
@@ -1348,8 +1409,8 @@ async function renderSummary() {
     });
     html += '<th>巡课人</th>';
     html += '</tr></thead><tbody>';
-    state.classes.forEach(cls => {
-      html += '<tr><td class="class-col">' + cls.name + '</td>';
+    visibleClasses().forEach(cls => {
+      html += '<tr><td class="class-col">' + (state.role === 'admin' ? '<span class="dept-badge">' + deptOfClass(cls.name) + '</span>' : '') + cls.name + '</td>';
       state.periods.forEach(p => {
         const key = cls.id + '_' + p.period;
         const rec = state.records[key];
@@ -1458,7 +1519,7 @@ function generateFeedback() {
   let issueArr = [];
   let totalChecked = 0, totalB = 0, totalC = 0, totalSpecial = 0;
 
-  state.classes.forEach(cls => {
+  visibleClasses().forEach(cls => {
     let classHasB = false, classHasC = false, classAllA = true, classSpecial = '';
     let classIssues = [];
     state.periods.forEach(p => {
@@ -1543,7 +1604,7 @@ function exportFeedbackWord() {
   html += '<h2>巡课汇总表</h2><table><thead><tr><th>班级</th>';
   state.periods.forEach(p => { html += '<th>' + p.label + '</th>'; });
   html += '<th>巡课人</th></tr></thead><tbody>';
-  state.classes.forEach(cls => {
+  visibleClasses().forEach(cls => {
     html += '<tr><td>' + cls.name + '</td>';
     const inspectors = new Set();
     state.periods.forEach(p => {
@@ -1602,7 +1663,7 @@ function exportSummary() {
   state.periods.forEach(p => { csv += ',' + p.label; });
   csv += '\n';
   // Rows
-  state.classes.forEach(cls => {
+  visibleClasses().forEach(cls => {
     csv += cls.name;
     state.periods.forEach(p => {
       const key = cls.id + '_' + p.period;
@@ -1624,7 +1685,7 @@ function exportSummary() {
   // Stats
   csv += '\n统计\n';
   let totalA = 0, totalB = 0, totalC = 0, totalSpecial = 0;
-  state.classes.forEach(cls => {
+  visibleClasses().forEach(cls => {
     state.periods.forEach(p => {
       const rec = state.records[cls.id + '_' + p.period];
       if (!rec) return;
