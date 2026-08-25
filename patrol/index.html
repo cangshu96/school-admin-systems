@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.8.1</title>
+<title>巡课汇总反馈系统 v2.8.2</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -206,6 +206,7 @@ body {
 }
 .special-badge.开会 { background: var(--purple-bg); color: var(--purple); }
 .special-badge.学生自习 { background: var(--teal-bg); color: var(--teal); }
+.special-badge.室外体育课 { background: var(--orange-bg); color: var(--orange); }
 
 .card-bottom {
   display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; flex-wrap: wrap;
@@ -432,7 +433,7 @@ body { font-size: 16px; line-height: 1.5; }
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.8.1</div>
+    <div class="version">v2.8.2</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
     <div class="form-group">
       <label>级部</label>
@@ -476,7 +477,7 @@ body { font-size: 16px; line-height: 1.5; }
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.8.1</span></h1>
+    <h1>📋 巡课汇总 <span class="ver">v2.8.2</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -508,6 +509,7 @@ body { font-size: 16px; line-height: 1.5; }
     </div>
     <div class="patrol-actions">
       <button class="btn btn-outline btn-sm" onclick="resetAllToA()">全部标记为A</button>
+      <button class="btn btn-outline btn-sm" onclick="resetAllToOutdoor()">⚽ 全部标记为室外体育课</button>
       <button class="btn btn-outline btn-sm" onclick="toggleStandards()">📋 打分标准</button>
       <span id="patrolSaveStatus" class="save-indicator"></span>
     </div>
@@ -708,10 +710,16 @@ const SCORE_GRADES = ['A', 'B', 'C'];
 const SPECIAL_OPTIONS = [
   { value: '', label: '正常' },
   { value: '开会', label: '开年级大会' },
-  { value: '学生自习', label: '学生自习' }
+  { value: '学生自习', label: '学生自习' },
+  { value: '室外体育课', label: '室外体育课' }
 ];
 const SCORE_COLORS = { 'A': 'var(--green)', 'B': 'var(--orange)', 'C': 'var(--red)' };
 const SCORE_BG = { 'A': 'var(--green-bg)', 'B': 'var(--orange-bg)', 'C': 'var(--red-bg)' };
+const SPECIAL_DISPLAY = {
+  '开会': { short: '开会', badge: '📢 开年级大会' },
+  '学生自习': { short: '自习', badge: '📖 学生自习' },
+  '室外体育课': { short: '体育课', badge: '⚽ 室外体育课' }
+};
 
 // 备注标准
 const STANDARDS = {
@@ -1098,7 +1106,7 @@ function renderClassCard(cls, rec, subject, teacher, photos) {
 
   // Special situation badge or scoring
   if (special) {
-    html += '<div class="special-badge ' + special + '">' + (special === '开会' ? '📢 开年级大会' : '📖 学生自习') + '</div>';
+    html += '<div class="special-badge ' + special + '">' + (SPECIAL_DISPLAY[special] ? SPECIAL_DISPLAY[special].badge : special) + '</div>';
   } else {
     // Score items
     SCORE_ITEMS.forEach(item => {
@@ -1249,20 +1257,56 @@ function showSaveStatus(classId, period, status) {
 // ============================================
 // 一键全A
 // ============================================
+// 通用确认弹层（兼容 QQ 等内嵌浏览器，不使用原生 confirm）
+let _confirmCb = null;
+function showConfirm(title, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  _confirmCb = cb;
+  document.getElementById('confirmOverlay').style.display = 'flex';
+}
+function cancelConfirm() {
+  _confirmCb = null;
+  document.getElementById('confirmOverlay').style.display = 'none';
+}
+function doConfirm() {
+  const cb = _confirmCb;
+  _confirmCb = null;
+  document.getElementById('confirmOverlay').style.display = 'none';
+  if (cb) cb();
+}
+
 async function resetAllToA() {
-  if (!confirm('确定将所有班级标记为A吗？')) return;
-  for (const cls of visibleClasses()) {
-    const key = cls.id + '_' + state.currentPeriod;
-    state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false, inspector: state.teacher };
-    try {
-      await savePatrolRecord(state.viewDate, cls.id, state.currentPeriod, state.records[key]);
-    } catch (err) {
-      showToast('保存失败：' + err.message, 'error');
-      return;
+  showConfirm('确定将所有班级标记为A吗？', async function() {
+    for (const cls of visibleClasses()) {
+      const key = cls.id + '_' + state.currentPeriod;
+      state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false, inspector: state.teacher };
+      try {
+        await savePatrolRecord(state.viewDate, cls.id, state.currentPeriod, state.records[key]);
+      } catch (err) {
+        showToast('保存失败：' + err.message, 'error');
+        return;
+      }
     }
-  }
-  renderPatrol();
-  showToast('已全部标记为A', 'success');
+    renderPatrol();
+    showToast('已全部标记为A', 'success');
+  });
+}
+
+async function resetAllToOutdoor() {
+  showConfirm('确定将所有班级标记为室外体育课吗？', async function() {
+    for (const cls of visibleClasses()) {
+      const key = cls.id + '_' + state.currentPeriod;
+      state.records[key] = { scores: {}, reasons: {}, remark: '', special: '室外体育课', has_photo: false, inspector: state.teacher };
+      try {
+        await savePatrolRecord(state.viewDate, cls.id, state.currentPeriod, state.records[key]);
+      } catch (err) {
+        showToast('保存失败：' + err.message, 'error');
+        return;
+      }
+    }
+    renderPatrol();
+    showToast('已全部标记为室外体育课', 'success');
+  });
 }
 
 // ============================================
@@ -1475,7 +1519,7 @@ async function renderSummary() {
         if (!rec) {
           html += '<td class="cell-none">-</td>';
         } else if (rec.special) {
-          html += '<td class="cell-special">' + (rec.special === '开会' ? '开会' : '自习') + '</td>';
+          html += '<td class="cell-special">' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) + '</td>';
         } else {
           const grades = SCORE_ITEMS.map(item => {
             const g = rec.scores[item] || 'A';
@@ -1517,7 +1561,7 @@ async function showCellDetail(classId, period) {
   if (sched && sched.subject) html += '<span style="margin-left:8px;color:var(--primary)">' + sched.subject + (sched.teacher_name ? ' · ' + sched.teacher_name : '') + '</span>';
   html += '</div>';
   if (rec.special) {
-    html += '<div class="special-badge ' + rec.special + '">' + (rec.special === '开会' ? '📢 开年级大会' : '📖 学生自习') + '</div>';
+    html += '<div class="special-badge ' + rec.special + '">' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].badge : rec.special) + '</div>';
   } else {
     html += '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px">';
     html += '<thead><tr style="background:var(--primary-light);color:var(--primary-dark)"><th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:left">项目</th><th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:center;width:60px">等级</th><th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:left">原因</th></tr></thead><tbody>';
@@ -1669,7 +1713,7 @@ function exportFeedbackWord() {
       const rec = state.records[cls.id + '_' + p.period];
       if (!rec) { html += '<td>-</td>'; return; }
       if (rec.inspector) inspectors.add(rec.inspector);
-      if (rec.special) { html += '<td>' + (rec.special === '开会' ? '开会' : '自习') + '</td>'; return; }
+      if (rec.special) { html += '<td>' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) + '</td>'; return; }
       const grades = SCORE_ITEMS.map(item => { const g = rec.scores[item] || 'A'; return g; }).join('/');
       html += '<td>' + grades + '</td>';
     });
@@ -2583,5 +2627,15 @@ async function init() {
 window.addEventListener('DOMContentLoaded', init);
 </script>
 <script>window.addEventListener('load',function(){var el=document.getElementById('app-loading');if(el){el.style.opacity='0';setTimeout(function(){el.remove()},300)}});</script>
+<!-- 通用确认弹层（兼容QQ内嵌浏览器） -->
+<div id="confirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px" onclick="cancelConfirm()">
+  <div style="background:#fff;border-radius:14px;padding:22px;width:100%;max-width:320px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.2)" onclick="event.stopPropagation()">
+    <div id="confirmTitle" style="font-size:16px;font-weight:600;margin-bottom:14px;line-height:1.5">确定执行此操作吗？</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-outline" style="flex:1" onclick="cancelConfirm()">取消</button>
+      <button class="btn btn-primary" style="flex:1" onclick="doConfirm()">确定</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
