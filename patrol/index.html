@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.8.2</title>
+<title>巡课汇总反馈系统 v2.8.3</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -359,6 +359,17 @@ body { -webkit-tap-highlight-color: transparent; }
 .dept-cards { display: flex; flex-wrap: wrap; gap: 8px; }
 .dept-cards .stat-card { min-width: 70px; padding: 6px 10px; }
 .dept-badge { display: inline-block; font-size: 10px; color: #fff; background: var(--primary); border-radius: 8px; padding: 1px 6px; margin-right: 4px; vertical-align: middle; }
+
+/* ===== B/C 预设原因标签 ===== */
+.reason-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px 78px; }
+.reason-tag { display: inline-block; font-size: 12px; color: var(--text2); background: #f5f7fa; border: 1px solid var(--border); border-radius: 12px; padding: 2px 10px; cursor: pointer; transition: all .15s; }
+.reason-tag.active { background: var(--primary-bg); color: var(--primary); border-color: var(--primary); font-weight: 600; }
+@media (max-width: 600px) {
+  .reason-tags { margin-left: 0; }
+}
+/* ===== 其他备注 ===== */
+.daily-note-card { background: #fff; border-radius: var(--radius); padding: 12px 16px; margin-top: 10px; }
+.daily-note-card .note-title { font-weight: 600; font-size: 15px; margin-bottom: 8px; }
 /* ===== 界面可读性增强 ===== */
 body { font-size: 16px; line-height: 1.5; }
 .btn { padding: 11px 18px; font-size: 15px; }
@@ -433,7 +444,7 @@ body { font-size: 16px; line-height: 1.5; }
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.8.2</div>
+    <div class="version">v2.8.3</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
     <div class="form-group">
       <label>级部</label>
@@ -477,7 +488,7 @@ body { font-size: 16px; line-height: 1.5; }
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.8.2</span></h1>
+    <h1>📋 巡课汇总 <span class="ver">v2.8.3</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -522,6 +533,11 @@ body { font-size: 16px; line-height: 1.5; }
     </div>
     <div id="patrolProgress" style="background:#fff;border-radius:var(--radius);padding:8px 16px;margin-bottom:10px;display:flex;align-items:center;gap:8px;font-size:13px"></div>
     <div id="patrolList"></div>
+    <div id="dailyNoteBox" class="screen-hidden" style="background:#fff;border-radius:var(--radius);padding:12px 16px;margin-top:10px">
+      <div class="note-title">📝 其他备注</div>
+      <textarea id="dailyNoteInput" placeholder="记录其他值得记录的事情（如整体课堂情况、临时情况等），自动保存..." style="width:100%;min-height:70px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;box-sizing:border-box" oninput="onDailyNoteInput()"></textarea>
+      <div id="dailyNoteStatus" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
+    </div>
   </div>
 
   <!-- Summary Tab -->
@@ -720,6 +736,15 @@ const SPECIAL_DISPLAY = {
   '学生自习': { short: '自习', badge: '📖 学生自习' },
   '室外体育课': { short: '体育课', badge: '⚽ 室外体育课' }
 };
+// B/C 等级的预设原因标签
+const REASON_TAGS = {
+  '教室环境_B': ['讲台杂乱', '地面不整洁', '桌椅不齐', '黑板未擦', '清洁用具乱放'],
+  '教室环境_C': ['教室脏乱', '垃圾未清理', '物品乱堆放', '墙面涂写', '桌椅凌乱'],
+  '课堂纪律_B': ['个别学生讲话', '学生走神', '坐姿不端正', '课前准备不足'],
+  '课堂纪律_C': ['课堂秩序混乱', '多人讲话', '学生趴桌', '随意走动', '做与课堂无关的事'],
+  '学习状态_B': ['部分学生未认真听讲', '回答不积极', '个别学生没跟上'],
+  '学习状态_C': ['多数学生未参与', '课堂氛围沉闷', '大面积走神', '学生发呆']
+};
 
 // 备注标准
 const STANDARDS = {
@@ -745,6 +770,7 @@ const state = {
   teacher: null,
   group: null,
   dept: null,
+  lastNoteDate: null,
   currentSettingsTab: 'classes',
   autoRefreshTimer: null,
   summaryDate: todayStr(),
@@ -1066,6 +1092,21 @@ function currentDeptLabel() {
 async function renderPatrol() {
   const container = document.getElementById('patrolList');
   const progressEl = document.getElementById('patrolProgress');
+  // 显示并加载其他备注
+  const noteBox = document.getElementById('dailyNoteBox');
+  const noteInput = document.getElementById('dailyNoteInput');
+  if (noteBox) noteBox.classList.remove('screen-hidden');
+  if (noteInput) {
+    if (state.lastNoteDate !== state.viewDate) {
+      state.lastNoteDate = state.viewDate;
+      noteInput.dataset.loaded = '';
+      noteInput.value = '';
+    }
+    if (!noteInput.dataset.loaded) {
+      noteInput.dataset.loaded = '1';
+      loadDailyNote(state.viewDate).then(n => { if (noteInput && !noteInput.dataset.editing) noteInput.value = n; }).catch(() => {});
+    }
+  }
   if (visibleClasses().length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="text">暂无班级</div><div class="hint">请在「设置」中添加班级</div></div>';
     return;
@@ -1123,6 +1164,15 @@ function renderClassCard(cls, rec, subject, teacher, photos) {
       html += '</div>';
       // Reason input for B/C
       if (grade !== 'A') {
+        const tags = (REASON_TAGS[item + '_' + grade] || []);
+        if (tags.length) {
+          const reasonsArr = (reason || '').split(/[,，、]/).map(x => x.trim()).filter(Boolean);
+          html += '<div class="reason-tags">';
+          tags.forEach(t => {
+            html += '<span class="reason-tag' + (reasonsArr.indexOf(t) >= 0 ? ' active' : '') + '" onclick="toggleReasonTag(\'' + cid + '\',' + period + ',\'' + item + '\',\'' + t + '\')">' + t + '</span>';
+          });
+          html += '</div>';
+        }
         html += '<input class="reason-input" placeholder="' + item + '：请简述原因..." value="' + escapeAttr(reason) + '" onchange="setReason(\'' + cid + '\',' + period + ',\'' + item + '\',this.value)">';
       }
     });
@@ -1194,6 +1244,43 @@ async function setReason(classId, period, item, reason) {
   if (reason) { rec.reasons[item] = reason; } else { delete rec.reasons[item]; }
   rec.inspector = state.teacher;
   schedulePatrolSave(state.viewDate, classId, period);
+}
+
+async function loadDailyNote(dateStr) {
+  const { data } = await sb.from('patrol_records')
+    .select('remark').eq('date', dateStr).eq('class_id', '__daily__').eq('period', 0).maybeSingle();
+  return data ? (data.remark || '') : '';
+}
+function onDailyNoteInput() {
+  const el = document.getElementById('dailyNoteInput');
+  if (!el) return;
+  el.dataset.editing = '1';
+  clearTimeout(window.__dailyNoteTimer);
+  window.__dailyNoteTimer = setTimeout(async () => {
+    const val = el.value;
+    const st = document.getElementById('dailyNoteStatus');
+    if (st) st.textContent = '保存中...';
+    try {
+      await savePatrolRecord(state.viewDate, '__daily__', 0, { remark: val, has_photo: false, inspector: state.teacher });
+      if (st) st.textContent = '✓ 已保存 ' + new Date().toLocaleTimeString().substring(0, 5);
+    } catch (e) {
+      if (st) st.textContent = '保存失败，请重试';
+    }
+  }, 1500);
+}
+
+function toggleReasonTag(classId, period, item, tag) {
+  const key = classId + '_' + period;
+  if (!state.records[key]) state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+  const rec = state.records[key];
+  if (!rec.reasons) rec.reasons = {};
+  const reasons = (rec.reasons[item] || '').split(/[,，、]/).map(x => x.trim()).filter(Boolean);
+  const idx = reasons.indexOf(tag);
+  if (idx >= 0) reasons.splice(idx, 1);
+  else reasons.push(tag);
+  rec.reasons[item] = reasons.join('、');
+  schedulePatrolSave(state.viewDate, classId, period);
+  renderPatrol();
 }
 
 async function setSpecial(classId, period, special) {
