@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.8.0</title>
+<title>巡课汇总反馈系统 v2.8.1</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -358,6 +358,64 @@ body { -webkit-tap-highlight-color: transparent; }
 .dept-cards { display: flex; flex-wrap: wrap; gap: 8px; }
 .dept-cards .stat-card { min-width: 70px; padding: 6px 10px; }
 .dept-badge { display: inline-block; font-size: 10px; color: #fff; background: var(--primary); border-radius: 8px; padding: 1px 6px; margin-right: 4px; vertical-align: middle; }
+/* ===== 界面可读性增强 ===== */
+body { font-size: 16px; line-height: 1.5; }
+.btn { padding: 11px 18px; font-size: 15px; }
+.btn-sm { padding: 5px 12px; font-size: 13px; }
+.login-card h1 { font-size: 24px; }
+.login-card .subtitle { font-size: 15px; }
+.login-card .version { font-size: 13px; }
+.form-group label { font-size: 15px; }
+.form-group select, .form-group input { font-size: 16px; padding: 10px 12px; }
+.admin-link { font-size: 15px; }
+.app-header h1 { font-size: 20px; }
+.app-header h1 .ver { font-size: 13px; }
+.header-info { font-size: 14px; }
+.header-info .date { font-size: 13px; }
+.logout-btn { font-size: 15px; padding: 6px 10px; }
+.tab-btn { font-size: 16px; padding: 13px 6px; }
+.period-bar .label { font-size: 16px; }
+.period-bar select { font-size: 15px; }
+.period-bar .time-info { font-size: 14px; }
+.period-bar .auto-tag { font-size: 13px; padding: 3px 9px; }
+.class-card .class-name { font-size: 21px; }
+.class-card .class-info { font-size: 15px; }
+.class-card .subject-teacher { font-size: 15px; }
+.score-row .item-name { font-size: 17px; min-width: 76px; }
+.grade-btn { font-size: 17px; }
+.reason-input { font-size: 15px; }
+.remark-input { font-size: 15px; }
+.special-badge { font-size: 14px; padding: 4px 11px; }
+.stat-card .num { font-size: 23px; }
+.stat-card .lbl { font-size: 13px; }
+.summary-table { font-size: 14px; }
+.summary-table .cell-special { font-size: 13px; }
+.feedback-section h3 { font-size: 17px; }
+.feedback-section textarea { font-size: 15px; }
+.settings-card .card-title { font-size: 17px; }
+.settings-table { font-size: 15px; }
+.settings-table input, .settings-table select { font-size: 14px; }
+.empty-state .text { font-size: 17px; }
+.empty-state .hint { font-size: 15px; }
+.save-indicator { font-size: 13px; }
+.dept-label { font-size: 16px; }
+.dept-cards .stat-card { min-width: 80px; padding: 8px 12px; }
+.dept-badge { font-size: 11px; padding: 2px 7px; }
+/* 移动端可读性增强 */
+@media (max-width: 768px) {
+  body { font-size: 15px; }
+  .tab-btn { font-size: 15px; padding: 12px 5px; }
+  .app-header h1 { font-size: 18px; }
+  .class-card .class-name { font-size: 19px; }
+  .class-card .class-info, .class-card .subject-teacher { font-size: 14px; }
+  .score-row .item-name { font-size: 15px; }
+  .grade-btn { font-size: 15px; }
+  .stat-card .num { font-size: 20px; }
+  .stat-card .lbl { font-size: 12px; }
+  .summary-table { font-size: 13px; }
+  .reason-input, .remark-input { font-size: 14px; }
+  .period-bar .time-info { font-size: 13px; }
+}
 </style>
 </head>
 <body>
@@ -374,7 +432,7 @@ body { -webkit-tap-highlight-color: transparent; }
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.8.0</div>
+    <div class="version">v2.8.1</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
     <div class="form-group">
       <label>级部</label>
@@ -418,7 +476,7 @@ body { -webkit-tap-highlight-color: transparent; }
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.8.0</span></h1>
+    <h1>📋 巡课汇总 <span class="ver">v2.8.1</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
