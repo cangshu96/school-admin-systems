@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.8.4</title>
+<title>巡课汇总反馈系统 v2.8.5</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -446,7 +446,7 @@ body { font-size: 16px; line-height: 1.5; }
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.8.4</div>
+    <div class="version">v2.8.5</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
     <div class="form-group">
       <label>级部</label>
@@ -490,7 +490,7 @@ body { font-size: 16px; line-height: 1.5; }
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.8.4</span></h1>
+    <h1>📋 巡课汇总 <span class="ver">v2.8.5</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -588,10 +588,12 @@ body { font-size: 16px; line-height: 1.5; }
     <div class="summary-bar">
       <span>范围</span>
       <select id="statsRange" onchange="renderStats()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+        <option value="today">当天</option>
         <option value="week">本周</option>
         <option value="month">本月</option>
       </select>
       <button class="btn btn-outline btn-sm" onclick="renderStats()">刷新</button>
+      <button class="btn btn-outline btn-sm" onclick="exportStatsExcel()">📥 导出Excel</button>
     </div>
     <div id="statsSummary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px"></div>
     <div style="background:#fff;border-radius:var(--radius);padding:12px;margin-bottom:12px">
@@ -1620,10 +1622,11 @@ async function renderSummary() {
       state.periods.forEach(p => {
         const key = cls.id + '_' + p.period;
         const rec = state.records[key];
+        const duty = rec && rec.scores && rec.scores['_banzhuren'] ? ' 👨\u200d🏫' : '';
         if (!rec) {
           html += '<td class="cell-none">-</td>';
         } else if (rec.special) {
-          html += '<td class="cell-special">' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) + '</td>';
+          html += '<td class="cell-special">' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) + duty + '</td>';
         } else {
           const grades = SCORE_ITEMS.map(item => {
             const g = rec.scores[item] || 'A';
@@ -1633,7 +1636,7 @@ async function renderSummary() {
           let cellClass = '';
           if (rec.remark) cellClass += ' cell-has-remark';
           if (rec.has_photo) cellClass += ' cell-has-photo';
-          html += '<td class="' + cellClass.trim() + '" style="cursor:pointer" onclick="showCellDetail(\'' + cls.id + '\',' + p.period + ')">' + grades.join(' ') + (rec.has_photo ? ' 📷' : '') + '</td>';
+          html += '<td class="' + cellClass.trim() + '" style="cursor:pointer" onclick="showCellDetail(\'' + cls.id + '\',' + p.period + ')">' + grades.join(' ') + (rec.has_photo ? ' 📷' : '') + duty + '</td>';
         }
       });
       // Show inspectors for this class
@@ -1861,6 +1864,78 @@ function exportFeedback() {
 // ============================================
 // 汇总导出
 // ============================================
+async function exportStatsExcel() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const range = document.getElementById('statsRange').value;
+  const rangeLabel = range === 'today' ? '当天' : (range === 'week' ? '本周' : '本月');
+  const dates = getStatsDates(range);
+  if (dates.length === 0) { showToast('所选范围暂无数据', 'error'); return; }
+  showLoading('正在导出...');
+  try {
+    const allData = {};
+    for (const d of dates) {
+      const { data } = await sb.from('patrol_records').select('*').eq('date', d);
+      const records = {};
+      if (data) data.forEach(r => { records[r.class_id + '_' + r.period] = r; });
+      allData[d] = records;
+    }
+    // Sheet1: 巡课明细
+    const detailRows = [];
+    const visCls = visibleClasses();
+    dates.forEach(d => {
+      visCls.forEach(cls => {
+        state.periods.forEach(p => {
+          const rec = allData[d] && allData[d][cls.id + '_' + p.period];
+          if (rec) {
+            const reasons = Object.entries(rec.reasons || {}).map(([k,v]) => k + ':' + v).join('; ');
+            detailRows.push({
+              '日期': d, '班级': cls.name, '节次': p.label,
+              '时间': p.start_time + '-' + p.end_time,
+              '教室环境': rec.scores && rec.scores['教室环境'] || 'A',
+              '课堂纪律': rec.scores && rec.scores['课堂纪律'] || 'A',
+              '学习状态': rec.scores && rec.scores['学习状态'] || 'A',
+              '原因': reasons,
+              '特殊情况': rec.special ? (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) : '',
+              '班主任坐班': (rec.scores && rec.scores['_banzhuren']) ? '是' : '',
+              '备注': rec.remark || '', '巡课人': rec.inspector || ''
+            });
+          }
+        });
+      });
+    });
+    // Sheet2: 班级汇总
+    const sumRows = visCls.map(cls => {
+      let checked=0, a=0, b=0, c=0, sp=0, duty=0;
+      dates.forEach(d => state.periods.forEach(p => {
+        const rec = allData[d] && allData[d][cls.id + '_' + p.period];
+        if (rec) { checked++; if (rec.special) sp++; SCORE_ITEMS.forEach(it=>{const g=(rec.scores[it]||'A'); if(g==='A')a++; else if(g==='B')b++; else c++;}); if (rec.scores && rec.scores['_banzhuren']) duty++; }
+      }));
+      return { '班级': cls.name, '级部': deptOfClass(cls.name), '已巡课': checked, 'A项': a, 'B项': b, 'C项': c, '特殊情况': sp, '班主任坐班': duty };
+    });
+    // Sheet3: 日期汇总
+    const dayRows = dates.map(d => {
+      let checked=0, a=0, b=0, c=0, sp=0, duty=0;
+      visCls.forEach(cls => state.periods.forEach(p => {
+        const rec = allData[d] && allData[d][cls.id + '_' + p.period];
+        if (rec) { checked++; if (rec.special) sp++; SCORE_ITEMS.forEach(it=>{const g=(rec.scores[it]||'A'); if(g==='A')a++; else if(g==='B')b++; else c++;}); if (rec.scores && rec.scores['_banzhuren']) duty++; }
+      }));
+      return { '日期': d, '已巡课': checked, 'A项': a, 'B项': b, 'C项': c, '特殊情况': sp, '班主任坐班': duty };
+    });
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.json_to_sheet(detailRows);
+    ws1['!cols'] = [{wch:12},{wch:6},{wch:10},{wch:12},{wch:8},{wch:8},{wch:8},{wch:40},{wch:10},{wch:10},{wch:20},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, ws1, '巡课明细');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sumRows), '班级汇总');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dayRows), '日期汇总');
+    XLSX.writeFile(wb, '巡课统计_' + rangeLabel + '.xlsx');
+    hideLoading();
+    showToast('已导出Excel（' + rangeLabel + '）', 'success');
+  } catch (err) {
+    hideLoading();
+    showToast('导出失败：' + err.message, 'error');
+  }
+}
+
 function exportSummary() {
   const date = state.summaryDate;
   let csv = '\uFEFF巡课汇总表 ' + date + '(周' + getWeekday(date) + ')\n\n';
@@ -2256,7 +2331,9 @@ async function renderStats() {
 function getStatsDates(range) {
   const dates = [];
   const today = new Date();
-  if (range === 'week') {
+  if (range === 'today') {
+    dates.push(today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0'));
+  } else if (range === 'week') {
     const monday = new Date(today);
     monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
     for (let d = new Date(monday); d <= today; d.setDate(d.getDate() + 1)) {
