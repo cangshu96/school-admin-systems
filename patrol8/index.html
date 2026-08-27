@@ -1,0 +1,2845 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<link rel="preconnect" href="https://cdn.bootcdn.net" crossorigin>
+<link rel="preconnect" href="https://cangshu96.github.io" crossorigin>
+<link rel="preconnect" href="https://vigzdhhrqjmbtwewgcrz.supabase.co" crossorigin>
+<style>
+#app-loading{position:fixed;top:0;left:0;width:100%;height:100%;background:#f0f2f5;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;transition:opacity .3s}
+#app-loading .spinner{width:40px;height:40px;border:3px solid #e0e0e0;border-top-color:#1677ff;border-radius:50%;animation:spin .8s linear infinite}
+#app-loading .text{margin-top:16px;color:#8c8c8c;font-size:15px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>八年级巡课汇总反馈系统 v3.0.0</title>
+<style>
+:root {
+  --primary: #1677ff;
+  --primary-light: #e6f4ff;
+  --primary-dark: #0958d9;
+  --green: #52c41a;
+  --green-bg: #f6ffed;
+  --orange: #fa8c16;
+  --orange-bg: #fff7e6;
+  --red: #ff4d4f;
+  --red-bg: #fff2f0;
+  --purple: #722ed1;
+  --purple-bg: #f9f0ff;
+  --teal: #08979c;
+  --teal-bg: #e6fffb;
+  --text: #1f1f1f;
+  --text2: #8c8c8c;
+  --border: #d9d9d9;
+  --bg: #f5f5f5;
+  --card-bg: #ffffff;
+  --radius: 10px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+.screen-hidden { display: none !important; }
+
+/* ===== Loading ===== */
+#loadingOverlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255,255,255,0.8); z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+}
+#loadingOverlay .spinner {
+  width: 36px; height: 36px; border: 3px solid var(--primary-light);
+  border-top-color: var(--primary); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== Toast ===== */
+#toastContainer {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 9998; display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 400px;
+}
+.toast {
+  padding: 10px 16px; border-radius: 8px; font-size: 14px; color: #fff;
+  animation: slideDown 0.3s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.toast.success { background: var(--green); }
+.toast.error { background: var(--red); }
+.toast.info { background: var(--primary); }
+@keyframes slideDown { from { transform: translateY(-20px); opacity: 0; } }
+
+/* ===== Login ===== */
+#loginScreen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.login-card {
+  background: #fff; border-radius: 16px; padding: 32px 28px; width: 100%; max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+.login-card h1 { font-size: 22px; text-align: center; margin-bottom: 4px; }
+.login-card .subtitle { font-size: 13px; color: var(--text2); text-align: center; margin-bottom: 24px; }
+.login-card .version { font-size: 12px; color: var(--text2); text-align: center; margin-bottom: 20px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+.form-group select, .form-group input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+  font-size: 15px; font-family: inherit; background: #fff;
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 16px; border: none; border-radius: 8px; font-size: 14px;
+  font-family: inherit; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+.btn-block { width: 100%; }
+.login-card .btn-block { padding: 12px; font-size: 16px; margin-top: 8px; }
+.admin-link { display: block; text-align: center; margin-top: 16px; font-size: 13px; color: var(--primary); cursor: pointer; }
+.admin-link:hover { text-decoration: underline; }
+
+/* ===== Main App ===== */
+#mainApp { min-height: 100vh; padding-bottom: 60px; }
+.app-header {
+  background: #fff; padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+}
+.app-header h1 { font-size: 17px; font-weight: 600; }
+.app-header h1 .ver { font-size: 11px; font-weight: 400; color: var(--text2); }
+.header-info { font-size: 12px; color: var(--text2); text-align: right; }
+.header-info .user { color: var(--primary); font-weight: 500; }
+.header-info .date { font-size: 11px; }
+.logout-btn { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 13px; padding: 4px 8px; }
+.logout-btn:hover { color: var(--red); }
+
+/* ===== Tabs ===== */
+.tab-bar {
+  display: flex; background: #fff; border-bottom: 1px solid var(--border);
+  position: sticky; top: 50px; z-index: 99; overflow-x: auto;
+}
+.tab-btn {
+  flex: 1; min-width: 70px; padding: 10px 8px; border: none; background: none;
+  font-size: 13px; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent;
+  white-space: nowrap; font-family: inherit; transition: all 0.2s;
+}
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 500; }
+.tab-content { display: none; padding: 12px; }
+.tab-content.active { display: block; }
+
+/* ===== Patrol Tab ===== */
+.period-bar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+  background: #fff; padding: 10px 12px; border-radius: var(--radius);
+}
+.period-bar .label { font-size: 14px; font-weight: 500; }
+.period-bar select {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: inherit; background: #fff;
+}
+.period-bar .time-info { font-size: 12px; color: var(--text2); }
+.period-bar .auto-tag {
+  font-size: 11px; color: var(--primary); background: var(--primary-light);
+  padding: 2px 8px; border-radius: 10px;
+}
+.patrol-actions { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+
+/* Class Card */
+.class-card {
+  background: #fff; border-radius: var(--radius); padding: 14px 16px;
+  margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.class-card .card-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+}
+.class-card .class-name { font-size: 18px; font-weight: 600; }
+.class-card .class-info { font-size: 13px; color: var(--text2); }
+.class-card .subject-teacher { font-size: 13px; color: var(--primary); margin-top: 2px; }
+
+.score-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.score-row:last-child { border-bottom: none; }
+.score-row .item-name { font-size: 14px; min-width: 70px; }
+.grade-btns { display: flex; gap: 4px; }
+.grade-btn {
+  padding: 4px 14px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 14px; font-weight: 600; cursor: pointer; background: #fff;
+  font-family: inherit; min-width: 36px; transition: all 0.15s;
+}
+.grade-btn.grade-a { color: var(--green); }
+.grade-btn.grade-b { color: var(--orange); }
+.grade-btn.grade-c { color: var(--red); }
+.grade-btn.active.grade-a { background: var(--green); color: #fff; border-color: var(--green); }
+.grade-btn.active.grade-b { background: var(--orange); color: #fff; border-color: var(--orange); }
+.grade-btn.active.grade-c { background: var(--red); color: #fff; border-color: var(--red); }
+
+.reason-input {
+  margin-top: 4px; margin-left: 78px;
+  padding: 4px 8px; border: 1px solid var(--orange); border-radius: 6px;
+  font-size: 13px; width: calc(100% - 78px); font-family: inherit;
+}
+.reason-input::placeholder { color: #bbb; }
+
+.special-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+.special-row select {
+  padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: inherit; background: #fff;
+}
+.special-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 500; margin-left: 8px;
+}
+.special-badge.开会 { background: var(--purple-bg); color: var(--purple); }
+.special-badge.学生自习 { background: var(--teal-bg); color: var(--teal); }
+.special-badge.室外体育课 { background: var(--orange-bg); color: var(--orange); }
+.duty-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; margin-left: 8px; color: var(--text2); background: #f5f7fa; border: 1px solid var(--border); cursor: pointer; transition: all .15s; }
+.duty-tag.active { background: var(--primary-bg); color: var(--primary); border-color: var(--primary); font-weight: 600; }
+
+.card-bottom {
+  display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; flex-wrap: wrap;
+}
+.remark-input {
+  flex: 1; min-width: 150px; padding: 6px 10px; border: 1px solid var(--border);
+  border-radius: 6px; font-size: 13px; font-family: inherit; background: #fff;
+}
+.photo-btn-wrap { position: relative; }
+.photo-btn {
+  padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; cursor: pointer; background: #fff; font-family: inherit;
+  display: flex; align-items: center; gap: 4px;
+}
+.photo-btn:hover { border-color: var(--primary); color: var(--primary); }
+.photo-thumb {
+  width: 48px; height: 48px; border-radius: 6px; object-fit: cover;
+  cursor: pointer; border: 1px solid var(--border);
+}
+.photo-modal {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85);
+  z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.photo-modal img { max-width: 95%; max-height: 90vh; border-radius: 8px; }
+.photo-modal .close-btn {
+  position: absolute; top: 16px; right: 20px; color: #fff; font-size: 28px;
+  cursor: pointer; background: rgba(0,0,0,0.5); width: 40px; height: 40px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.save-indicator { font-size: 11px; color: var(--text2); margin-left: auto; }
+.save-indicator.saving { color: var(--orange); }
+.save-indicator.saved { color: var(--green); }
+.save-indicator.error { color: var(--red); }
+
+/* ===== Summary Tab ===== */
+.summary-bar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+  background: #fff; padding: 10px 12px; border-radius: var(--radius);
+}
+.summary-stats {
+  display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.stat-card {
+  background: #fff; border-radius: var(--radius); padding: 10px 14px;
+  flex: 1; min-width: 90px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.stat-card .num { font-size: 20px; font-weight: 700; }
+.stat-card .lbl { font-size: 11px; color: var(--text2); }
+.summary-table-wrap { overflow-x: auto; background: #fff; border-radius: var(--radius); }
+.summary-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 800px; }
+.summary-table th, .summary-table td {
+  border: 1px solid #f0f0f0; padding: 5px 6px; text-align: center;
+}
+.summary-table th { background: var(--primary-light); color: var(--primary-dark); font-weight: 500; }
+.summary-table .class-col { font-weight: 600; background: #fafafa; }
+.cell-a { color: var(--green); font-weight: 600; }
+.cell-b { color: var(--orange); font-weight: 600; }
+.cell-c { color: var(--red); font-weight: 600; }
+.cell-special { color: var(--purple); font-size: 11px; }
+.cell-none { color: #d9d9d9; }
+.cell-has-photo { color: var(--primary); }
+.cell-has-remark { background: #fffbe6; }
+
+/* ===== Feedback Tab ===== */
+.feedback-section { background: #fff; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; }
+.feedback-section h3 { font-size: 15px; margin-bottom: 10px; }
+.feedback-section textarea {
+  width: 100%; min-height: 100px; padding: 10px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; line-height: 1.6;
+}
+.feedback-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ===== Settings Tab ===== */
+.settings-subtabs { display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap; }
+.settings-subtab {
+  padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px;
+  font-size: 13px; cursor: pointer; background: #fff; font-family: inherit;
+}
+.settings-subtab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.settings-card {
+  background: #fff; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.settings-card .card-title { font-size: 15px; font-weight: 500; margin-bottom: 10px; }
+.add-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.add-row input, .add-row select {
+  padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; font-family: inherit;
+}
+.settings-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.settings-table th, .settings-table td {
+  border: 1px solid #f0f0f0; padding: 5px 8px; text-align: center;
+}
+.settings-table th { background: var(--primary-light); color: var(--primary-dark); }
+.settings-table input, .settings-table select {
+  padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 12px; font-family: inherit; width: 100%;
+}
+.remove-x { cursor: pointer; color: var(--red); font-size: 16px; }
+
+.empty-state { text-align: center; padding: 30px 20px; color: var(--text2); }
+.empty-state .text { font-size: 15px; margin-bottom: 4px; }
+.empty-state .hint { font-size: 13px; }
+
+/* ===== Card status ===== */
+.class-card.card-checked { border-left: 3px solid var(--green); }
+.class-card.card-unchecked { border-left: 3px solid var(--border); }
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .class-card { padding: 12px; }
+  .class-card .class-name { font-size: 16px; }
+  .score-row .item-name { min-width: 64px; font-size: 13px; }
+  .grade-btn { padding: 4px 12px; }
+  .app-header h1 { font-size: 15px; }
+  .summary-table { font-size: 11px; }
+}
+/* ===== 移动端适配增强 ===== */
+html { -webkit-text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
+@media (max-width: 600px) {
+  body { font-size: 15px; }
+  .class-card { padding: 12px; }
+  .class-card .class-name { font-size: 17px; }
+  .class-card .class-info, .class-card .subject-teacher { font-size: 13px; }
+  .score-row { flex-wrap: wrap; gap: 6px; }
+  .score-row .item-name { font-size: 14px; min-width: 58px; }
+  .grade-btns { flex: 1; justify-content: flex-end; gap: 6px; }
+  .grade-btn { padding: 10px 0; font-size: 15px; min-width: 0; flex: 1; max-width: 76px; }
+  .reason-input { margin-left: 0; width: 100%; }
+  .remark-input { min-width: 0; }
+  .special-row { flex-wrap: wrap; }
+  .special-badge { margin-left: 0; }
+  .period-bar .time-info { font-size: 12px; }
+  .summary-table { font-size: 12px; }
+  .tab-btn { min-width: 62px; padding: 12px 6px; font-size: 14px; }
+  .photo-thumb { width: 44px; height: 44px; }
+  .settings-table { font-size: 12px; }
+  .summary-bar { gap: 6px; }
+}
+@media (max-width: 420px) {
+  .score-row .item-name { min-width: 52px; font-size: 13px; }
+  .grade-btn { font-size: 14px; }
+  .photo-btn { padding: 8px 12px; }
+}
+/* ===== 级部分组统计 ===== */
+.dept-stats { background: #fff; border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; }
+.dept-stats.dept-total { border: 2px solid var(--primary); }
+.dept-label { font-weight: 600; font-size: 14px; color: var(--primary-dark); margin-bottom: 8px; }
+.dept-cards { display: flex; flex-wrap: wrap; gap: 8px; }
+.dept-cards .stat-card { min-width: 70px; padding: 6px 10px; }
+.dept-badge { display: inline-block; font-size: 10px; color: #fff; background: var(--primary); border-radius: 8px; padding: 1px 6px; margin-right: 4px; vertical-align: middle; }
+
+/* ===== B/C 预设原因标签 ===== */
+.reason-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px 78px; }
+.reason-tag { display: inline-block; font-size: 12px; color: var(--text2); background: #f5f7fa; border: 1px solid var(--border); border-radius: 12px; padding: 2px 10px; cursor: pointer; transition: all .15s; }
+.reason-tag.active { background: var(--primary-bg); color: var(--primary); border-color: var(--primary); font-weight: 600; }
+@media (max-width: 600px) {
+  .reason-tags { margin-left: 0; }
+}
+/* ===== 其他备注 ===== */
+.daily-note-card { background: #fff; border-radius: var(--radius); padding: 12px 16px; margin-top: 10px; }
+.daily-note-card .note-title { font-weight: 600; font-size: 15px; margin-bottom: 8px; }
+/* ===== 界面可读性增强 ===== */
+body { font-size: 16px; line-height: 1.5; }
+.btn { padding: 11px 18px; font-size: 15px; }
+.btn-sm { padding: 5px 12px; font-size: 13px; }
+.login-card h1 { font-size: 24px; }
+.login-card .subtitle { font-size: 15px; }
+.login-card .version { font-size: 13px; }
+.form-group label { font-size: 15px; }
+.form-group select, .form-group input { font-size: 16px; padding: 10px 12px; }
+.admin-link { font-size: 15px; }
+.app-header h1 { font-size: 20px; }
+.app-header h1 .ver { font-size: 13px; }
+.header-info { font-size: 14px; }
+.header-info .date { font-size: 13px; }
+.logout-btn { font-size: 15px; padding: 6px 10px; }
+.tab-btn { font-size: 16px; padding: 13px 6px; }
+.period-bar .label { font-size: 16px; }
+.period-bar select { font-size: 15px; }
+.period-bar .time-info { font-size: 14px; }
+.period-bar .auto-tag { font-size: 13px; padding: 3px 9px; }
+.class-card .class-name { font-size: 21px; }
+.class-card .class-info { font-size: 15px; }
+.class-card .subject-teacher { font-size: 15px; }
+.score-row .item-name { font-size: 17px; min-width: 76px; }
+.grade-btn { font-size: 17px; }
+.reason-input { font-size: 15px; }
+.remark-input { font-size: 15px; }
+.special-badge { font-size: 14px; padding: 4px 11px; }
+.stat-card .num { font-size: 23px; }
+.stat-card .lbl { font-size: 13px; }
+.summary-table { font-size: 14px; }
+.summary-table .cell-special { font-size: 13px; }
+.feedback-section h3 { font-size: 17px; }
+.feedback-section textarea { font-size: 15px; }
+.settings-card .card-title { font-size: 17px; }
+.settings-table { font-size: 15px; }
+.settings-table input, .settings-table select { font-size: 14px; }
+.empty-state .text { font-size: 17px; }
+.empty-state .hint { font-size: 15px; }
+.save-indicator { font-size: 13px; }
+.dept-label { font-size: 16px; }
+.dept-cards .stat-card { min-width: 80px; padding: 8px 12px; }
+.dept-badge { font-size: 11px; padding: 2px 7px; }
+/* 移动端可读性增强 */
+@media (max-width: 768px) {
+  body { font-size: 15px; }
+  .tab-btn { font-size: 15px; padding: 12px 5px; }
+  .app-header h1 { font-size: 18px; }
+  .class-card .class-name { font-size: 19px; }
+  .class-card .class-info, .class-card .subject-teacher { font-size: 14px; }
+  .score-row .item-name { font-size: 15px; }
+  .grade-btn { font-size: 15px; }
+  .stat-card .num { font-size: 20px; }
+  .stat-card .lbl { font-size: 12px; }
+  .summary-table { font-size: 13px; }
+  .reason-input, .remark-input { font-size: 14px; }
+  .period-bar .time-info { font-size: 13px; }
+}
+</style>
+</head>
+<body>
+<div id="app-loading"><div class="spinner"></div><div class="text">正在加载系统...</div></div>
+
+<div id="loadingOverlay" class="screen-hidden">
+  <div class="spinner"></div>
+  <div id="loadingText">加载中...</div>
+</div>
+
+<div id="toastContainer"></div>
+
+<!-- ===== Login Screen ===== -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>📋 八年级巡课汇总反馈系统</h1>
+    <div class="version">v3.0.0</div>
+    <div class="subtitle">武汉市二桥中学 · 知音八年级</div>
+    <div class="form-group" id="loginDeptGroup">
+      <label>级部</label>
+      <select id="loginDept" onchange="updateTeacherList()">
+        <option value="">请选择级部</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>备课组</label>
+      <select id="loginGroup" onchange="updateTeacherList()">
+        <option value="">请选择备课组</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>巡课教师</label>
+      <select id="loginTeacher">
+        <option value="">请先选择备课组</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doLogin()">登录巡课</button>
+    <div class="admin-link" onclick="showAdminLogin()">教务处入口</div>
+  </div>
+</div>
+
+<!-- ===== Admin Login ===== -->
+<div id="adminLoginScreen" class="screen-hidden">
+  <div class="login-card">
+    <h1>🔐 教务处登录</h1>
+    <div class="subtitle">巡课汇总反馈系统</div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" id="adminPassword" placeholder="请输入教务处密码" onkeydown="if(event.key==='Enter')doAdminLogin()">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doAdminLogin()">登录</button>
+    <div class="admin-link" onclick="showLoginScreen()">返回教师登录</div>
+  </div>
+</div>
+
+<!-- ===== Main App ===== -->
+<div id="mainApp" class="screen-hidden">
+  <div class="app-header">
+    <h1>📋 八年级巡课汇总 <span class="ver">v3.0.0</span></h1>
+    <div class="header-info">
+      <div class="user" id="headerUser"></div>
+      <div class="date" id="headerDate"></div>
+      <button class="logout-btn" onclick="logout()">退出</button>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="patrol" onclick="switchTab('patrol')">巡课</button>
+    <button class="tab-btn" data-tab="summary" onclick="switchTab('summary')">汇总</button>
+    <button class="tab-btn" data-tab="feedback" onclick="switchTab('feedback')">反馈</button>
+    <button class="tab-btn" data-tab="stats" onclick="switchTab('stats')">统计</button>
+    <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">设置</button>
+    <button class="tab-btn" data-tab="issues" onclick="switchTab('issues')">问题</button>
+  </div>
+
+  <!-- Patrol Tab -->
+  <div id="tab-patrol" class="tab-content active">
+    <div class="period-bar">
+      <span class="label">当前节次</span>
+      <select id="periodSelect" onchange="onPeriodChange()"></select>
+      <span class="time-info" id="periodTime"></span>
+      <span class="auto-tag" id="autoPeriodTag" style="display:none">自动检测</span>
+    </div>
+    <div class="period-bar" style="margin-top:8px">
+      <span class="label">日期</span>
+      <input type="date" id="patrolDate" onchange="onPatrolDateChange()" max="" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+      <button class="btn btn-outline btn-sm" onclick="goToToday()">今天</button>
+    </div>
+    <div class="patrol-actions">
+      <button class="btn btn-outline btn-sm" onclick="resetAllToA()">全部标记为A</button>
+      <button class="btn btn-outline btn-sm" onclick="resetAllToOutdoor()">⚽ 全部标记为室外体育课</button>
+      <button class="btn btn-outline btn-sm" onclick="toggleStandards()">📋 打分标准</button>
+      <span id="patrolSaveStatus" class="save-indicator"></span>
+    </div>
+    <div id="standardsPanel" class="screen-hidden" style="background:#fff;border-radius:var(--radius);padding:12px 16px;margin-bottom:12px;font-size:13px;line-height:1.8">
+      <div style="font-weight:600;margin-bottom:6px">📝 巡堂三环节关注点</div>
+      <div style="margin-bottom:8px"><b>教室环境：</b>地面干净、讲台/黑板清洁到位、清洁用具摆放整齐、桌椅摆放整齐、窗帘按统一要求整理、窗户按统一要求开关、走廊清洁到位、垃圾清理干净</div>
+      <div style="margin-bottom:8px"><b>课堂纪律：</b>课前准备到位，遵守课堂纪律，不讲小话、不做小动作，不做与上课无关的事情</div>
+      <div style="margin-bottom:8px"><b>学习状态：</b>学习专注，听讲认真，积极参与、不东张西望，不发呆走神</div>
+      <div style="color:var(--text2);font-size:12px">每个巡查项目评价分为 A、B、C 三个等级。若不是A等级，请简述原因。</div>
+    </div>
+    <div id="patrolProgress" style="background:#fff;border-radius:var(--radius);padding:8px 16px;margin-bottom:10px;display:flex;align-items:center;gap:8px;font-size:13px"></div>
+    <div id="patrolList"></div>
+    <div id="dailyNoteBox" class="screen-hidden" style="background:#fff;border-radius:var(--radius);padding:12px 16px;margin-top:10px">
+      <div class="note-title">📝 其他备注</div>
+      <textarea id="dailyNoteInput" placeholder="记录其他值得记录的事情（如整体课堂情况、临时情况等），自动保存..." style="width:100%;min-height:70px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:14px;font-family:inherit;box-sizing:border-box" oninput="onDailyNoteInput()"></textarea>
+      <div id="dailyNoteStatus" style="font-size:12px;color:var(--text2);margin-top:4px"></div>
+    </div>
+  </div>
+
+  <!-- Summary Tab -->
+  <div id="tab-summary" class="tab-content">
+    <div class="summary-bar">
+      <span>日期</span>
+      <input type="date" id="summaryDate" onchange="renderSummary()">
+      <button class="btn btn-outline btn-sm" onclick="renderSummary()">刷新</button>
+      <span id="summaryAutoRefresh" style="font-size:11px;color:var(--text2);margin-left:auto">每30秒自动刷新</span>
+    </div>
+    <div class="summary-stats" id="summaryStats"></div>
+    <div class="summary-table-wrap" id="summaryGrid"></div>
+    <div style="margin-top:12px">
+      <button class="btn btn-outline btn-sm" onclick="exportSummary()">导出汇总CSV</button>
+    </div>
+  </div>
+
+  <!-- Feedback Tab -->
+  <div id="tab-feedback" class="tab-content">
+    <div class="summary-bar">
+      <span>日期</span>
+      <input type="date" id="feedbackDate" onchange="renderFeedback()">
+    </div>
+    <div class="feedback-section">
+      <h3>✅ 好的方面</h3>
+      <textarea id="goodPoints" placeholder="总结表现好的班级和具体做法..."></textarea>
+    </div>
+    <div class="feedback-section">
+      <h3>⚠️ 不足之处</h3>
+      <textarea id="issues" placeholder="指明存在问题的班级和具体情况..."></textarea>
+    </div>
+    <div class="feedback-section">
+      <h3>📝 巡堂总结</h3>
+      <textarea id="summaryText" placeholder="总体评价和建议..."></textarea>
+    </div>
+    <div class="feedback-actions">
+      <button class="btn btn-primary btn-sm" onclick="generateFeedback()">自动生成</button>
+      <button class="btn btn-outline btn-sm" onclick="saveFeedback()">保存反馈</button>
+      <button class="btn btn-outline btn-sm" onclick="exportFeedback()">导出CSV</button>
+      <button class="btn btn-primary btn-sm" onclick="exportFeedbackWord()">导出Word</button>
+    </div>
+  </div>
+
+  <!-- Stats Tab -->
+  <div id="tab-stats" class="tab-content">
+    <div class="summary-bar">
+      <span>范围</span>
+      <select id="statsRange" onchange="renderStats()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+        <option value="today">当天</option>
+        <option value="week">本周</option>
+        <option value="month">本月</option>
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="renderStats()">刷新</button>
+      <button class="btn btn-outline btn-sm" onclick="exportStatsExcel()">📥 导出Excel</button>
+    </div>
+    <div id="statsSummary" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <div style="background:#fff;border-radius:var(--radius);padding:12px;margin-bottom:12px">
+      <h3 style="font-size:15px;margin-bottom:8px">📊 各班A率趋势</h3>
+      <canvas id="chartClassTrend" style="max-height:300px"></canvas>
+    </div>
+    <div style="background:#fff;border-radius:var(--radius);padding:12px;margin-bottom:12px">
+      <h3 style="font-size:15px;margin-bottom:8px">📈 每日出勤率趋势</h3>
+      <canvas id="chartDailyTrend" style="max-height:300px"></canvas>
+    </div>
+    <div style="background:#fff;border-radius:var(--radius);padding:12px;margin-bottom:12px">
+      <h3 style="font-size:15px;margin-bottom:8px">🔍 重点关注班级</h3>
+      <div id="statsAlerts"></div>
+    </div>
+  </div>
+
+  <!-- Settings Tab -->
+  <div id="tab-settings" class="tab-content">
+    <div class="settings-subtabs">
+      <button class="settings-subtab active" onclick="switchSettingsTab('classes')">班级管理</button>
+      <button class="settings-subtab" onclick="switchSettingsTab('teachers')">教师管理</button>
+      <button class="settings-subtab" onclick="switchSettingsTab('schedule')">课表配置</button>
+      <button class="settings-subtab" onclick="switchSettingsTab('periods')">节次时间</button>
+    </div>
+    <div id="settingsClasses"></div>
+    <div id="settingsTeachers" class="screen-hidden"></div>
+    <div id="settingsSchedule" class="screen-hidden"></div>
+    <div id="settingsPeriods" class="screen-hidden"></div>
+  </div>
+
+  <!-- Issues Tab -->
+  <div id="tab-issues" class="tab-content">
+    <div class="summary-bar">
+      <span>问题跟踪闭环</span>
+      <select id="issueFilter" onchange="renderIssues()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit">
+        <option value="全部">全部状态</option>
+        <option>待处理</option>
+        <option>处理中</option>
+        <option>已解决</option>
+        <option>已关闭</option>
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="exportIssues()">导出Excel</button>
+    </div>
+    <div id="issueStats" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <div style="background:#fff;border-radius:var(--radius);padding:12px 16px;margin-bottom:12px">
+      <div style="font-weight:600;margin-bottom:8px">➕ 新建问题</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <input type="date" id="issueDate">
+        <select id="issueClass"><option value="">不指定班级</option></select>
+        <select id="issueCategory">
+          <option>教室环境</option><option>课堂纪律</option><option>学习状态</option><option>系统问题</option><option>其他</option>
+        </select>
+        <input type="text" id="issueReporter" placeholder="提交人" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <textarea id="issueContent" placeholder="问题描述..." style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;min-height:60px"></textarea>
+        <button class="btn btn-primary btn-sm" onclick="addIssue()">提交问题</button>
+      </div>
+    </div>
+    <div id="issueList"></div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div id="detailModal" class="photo-modal screen-hidden" style="background:rgba(0,0,0,0.5)" onclick="closeDetailModal(event)">
+  <div style="background:#fff;border-radius:12px;padding:20px;max-width:500px;width:90%;max-height:80vh;overflow-y:auto;position:relative">
+    <div class="detail-close" style="position:absolute;top:8px;right:12px;cursor:pointer;font-size:22px;color:var(--text2)">×</div>
+    <div id="detailModalBody"></div>
+  </div>
+</div>
+
+<!-- Photo Modal -->
+<div id="photoModal" class="photo-modal screen-hidden" onclick="closePhotoModal(event)">
+  <div class="close-btn">×</div>
+  <img id="photoModalImg" src="">
+</div>
+
+<script src="https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js"></script>
+
+<script>
+// ============ 按需加载库 ============
+const __CDN = {
+  chart: 'https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+  xlsx: 'https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+};
+function loadLib(name) {
+  return new Promise((resolve, reject) => {
+    const globalName = name === 'chart' ? 'Chart' : 'XLSX';
+    if (window[globalName]) return resolve();
+    const s = document.createElement('script');
+    s.src = __CDN[name];
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ reject(new Error('加载' + name + '库失败，请检查网络')); };
+    document.head.appendChild(s);
+  });
+}
+</script>
+<script>
+// ============ 写库防抖（合并多次打分为一次保存） ============
+let __patrolSaveTimers = {};
+function schedulePatrolSave(dateStr, classId, period) {
+  const key = classId + '_' + period;
+  showSaveStatus(classId, period, 'saving');
+  if (__patrolSaveTimers[key]) clearTimeout(__patrolSaveTimers[key]);
+  __patrolSaveTimers[key] = setTimeout(async () => {
+    try {
+      const rec = state.records[key] || {};
+      await savePatrolRecord(dateStr, classId, period, rec);
+      showSaveStatus(classId, period, 'saved');
+      delete __patrolSaveTimers[key];
+    } catch (err) {
+      showSaveStatus(classId, period, 'error');
+      showToast('保存失败：' + err.message, 'error');
+      delete __patrolSaveTimers[key];
+    }
+  }, 1500);
+}
+</script>
+
+
+
+<script>
+// ============================================
+// 配置
+// ============================================
+const EMBEDDED_CONFIG = {
+  supabaseUrl: 'https://vigzdhhrqjmbtwewgcrz.supabase.co',
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ3pkaGhycWptYnR3ZXdnY3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDI2NjksImV4cCI6MjEwMjcxODY2OX0.JNw_f2j776kVcVBLbtmScXMs_KU5ZOeyockBIFbT8oU'
+};
+const ADMIN_PASSWORD = 'EQjwc';
+const PATROL_GROUPS = ['语文', '数学', '英语', '道法', '历史', '综合组'];
+
+// ===== 学年配置（构建脚本按年级替换此块）=====
+const GRADE_CONFIG = {"grade": "八年级", "dir": "patrol8", "subtitle": "武汉市二桥中学 · 知音八年级", "classPrefix": 8, "suffix": "_g8", "depts": [{"name": "一级部", "min": 1, "max": 8}, {"name": "二级部", "min": 9, "max": 16}]};
+// 表名辅助：八年级表带 _g8 后缀，九年级带 _g9 后缀，七年级无后缀
+function TB(name) { return name + GRADE_CONFIG.suffix; }
+// 级部范围标签，如 一级部（701-707）
+function deptRangeLabel(d) {
+  const pre = GRADE_CONFIG.classPrefix * 100;
+  return d.name + '（' + (pre + d.min) + '-' + (pre + d.max) + '）';
+}
+const SCORE_ITEMS = ['教室环境', '课堂纪律', '学习状态'];
+const SCORE_GRADES = ['A', 'B', 'C'];
+const SPECIAL_OPTIONS = [
+  { value: '', label: '正常' },
+  { value: '开会', label: '开年级大会' },
+  { value: '学生自习', label: '学生自习' },
+  { value: '室外体育课', label: '室外体育课' }
+];
+const SCORE_COLORS = { 'A': 'var(--green)', 'B': 'var(--orange)', 'C': 'var(--red)' };
+const SCORE_BG = { 'A': 'var(--green-bg)', 'B': 'var(--orange-bg)', 'C': 'var(--red-bg)' };
+const SPECIAL_DISPLAY = {
+  '开会': { short: '开会', badge: '📢 开年级大会' },
+  '学生自习': { short: '自习', badge: '📖 学生自习' },
+  '室外体育课': { short: '体育课', badge: '⚽ 室外体育课' }
+};
+// B/C 等级的预设原因标签
+const REASON_TAGS = {
+  '教室环境_B': ['讲台杂乱', '地面不整洁', '桌椅不齐', '黑板未擦', '清洁用具乱放'],
+  '教室环境_C': ['教室脏乱', '垃圾未清理', '物品乱堆放', '墙面涂写', '桌椅凌乱'],
+  '课堂纪律_B': ['个别学生讲话', '学生走神', '坐姿不端正', '课前准备不足'],
+  '课堂纪律_C': ['课堂秩序混乱', '多人讲话', '学生趴桌', '随意走动', '做与课堂无关的事'],
+  '学习状态_B': ['部分学生未认真听讲', '回答不积极', '个别学生没跟上'],
+  '学习状态_C': ['多数学生未参与', '课堂氛围沉闷', '大面积走神', '学生发呆']
+};
+
+// 备注标准
+const STANDARDS = {
+  '教室环境': '地面干净、讲台/黑板清洁到位、清洁用具摆放整齐、桌椅摆放整齐、窗帘按统一要求整理、窗户按统一要求开关、走廊清洁到位、垃圾清理干净',
+  '课堂纪律': '课前准备到位，遵守课堂纪律，不讲小话、不做小动作，不做与上课无关的事情',
+  '学习状态': '学习专注，听讲认真，积极参与、不东张西望，不发呆走神'
+};
+
+// ============================================
+// 状态
+// ============================================
+let sb = null;
+const state = {
+  classes: [],
+  teachers: [],
+  periods: [],
+  schedule: {},
+  records: {},
+  photos: {},
+  currentPeriod: 1,
+  viewDate: todayStr(),
+  role: null,
+  teacher: null,
+  group: null,
+  dept: null,
+  lastNoteDate: null,
+  currentSettingsTab: 'classes',
+  autoRefreshTimer: null,
+  summaryDate: todayStr(),
+  feedbackDate: todayStr(),
+  photoCache: {},
+  issues: [],
+};
+
+const LAST_TEACHER_KEY = 'patrol_last_teacher';
+const LAST_GROUP_KEY = 'patrol_last_group';
+
+// ============================================
+// 工具函数
+// ============================================
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function formatDateCN(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  return parseInt(parts[1]) + '月' + parseInt(parts[2]) + '日';
+}
+function getWeekday(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return ['日','一','二','三','四','五','六'][d.getDay()];
+}
+function nowHHMM() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+// ============================================
+// Loading & Toast
+// ============================================
+function showLoading(text) {
+  document.getElementById('loadingText').textContent = text || '加载中...';
+  document.getElementById('loadingOverlay').classList.remove('screen-hidden');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.add('screen-hidden');
+}
+function showToast(msg, type) {
+  type = type || 'info';
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2500);
+}
+
+// ============================================
+// Supabase 初始化
+// ============================================
+function initSupabase() {
+  sb = supabase.createClient(EMBEDDED_CONFIG.supabaseUrl, EMBEDDED_CONFIG.supabaseKey);
+}
+
+// ============================================
+// 数据加载
+// ============================================
+async function loadClasses() {
+  const { data, error } = await sb.from(TB('patrol_classes')).select('*').order('sort_order');
+  if (error) throw error;
+  state.classes = data || [];
+}
+async function loadTeachers() {
+  const { data, error } = await sb.from(TB('patrol_teachers')).select('*').order('sort_order');
+  if (error) throw error;
+  state.teachers = data || [];
+}
+async function loadPeriods() {
+  const { data, error } = await sb.from(TB('patrol_periods')).select('*').order('period');
+  if (error) throw error;
+  state.periods = data || [];
+}
+async function loadSchedule() {
+  const { data, error } = await sb.from(TB('patrol_schedule')).select('*');
+  if (error) throw error;
+  state.schedule = {};
+  if (data) {
+    data.forEach(row => {
+      const key = row.class_id + '_' + row.period;
+      state.schedule[key] = { subject: row.subject, teacher_name: row.teacher_name, id: row.id };
+    });
+  }
+}
+async function loadData() {
+  showLoading('加载数据...');
+  try {
+    await Promise.all([loadClasses(), loadTeachers(), loadPeriods(), loadSchedule()]);
+    hideLoading();
+  } catch (err) {
+    hideLoading();
+    showToast('数据加载失败：' + err.message, 'error');
+  }
+}
+
+// ============================================
+// 巡课记录加载与保存
+// ============================================
+async function loadPatrolRecords(dateStr) {
+  const { data, error } = await sb.from(TB('patrol_records'))
+    .select('*').eq('date', dateStr);
+  if (error) throw error;
+  state.records = {};
+  if (data) {
+    data.forEach(row => {
+      const key = row.class_id + '_' + row.period;
+      state.records[key] = {
+        scores: row.scores || {},
+        reasons: row.reasons || {},
+        remark: row.remark || '',
+        special: row.special || '',
+        inspector: row.inspector || '',
+        has_photo: row.has_photo || false
+      };
+    });
+  }
+}
+async function loadPatrolPhotos(dateStr, period) {
+  const { data, error } = await sb.from(TB('patrol_photos'))
+    .select('*').eq('date', dateStr).eq('period', period);
+  if (error) throw error;
+  state.photos = {};
+  if (data) {
+    data.forEach(row => {
+      const key = row.class_id + '_' + row.period;
+      if (!state.photos[key]) state.photos[key] = [];
+      state.photos[key].push({ id: row.id, path: row.photo_path, url: row.photo_path ? getPhotoUrl(row.photo_path) : '' });
+    });
+  }
+}
+
+async function savePatrolRecord(dateStr, classId, period, data) {
+  const record = {
+    date: dateStr,
+    class_id: classId,
+    period: period,
+    inspector: data.inspector || state.teacher || '',
+    scores: data.scores || {},
+    reasons: data.reasons || {},
+    remark: data.remark || '',
+    special: data.special || null,
+    has_photo: data.has_photo || false,
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from(TB('patrol_records'))
+    .upsert(record, { onConflict: 'date,class_id,period' });
+  if (error) throw error;
+}
+
+// ============================================
+// 节次检测
+// ============================================
+function detectCurrentPeriod() {
+  const hhmm = nowHHMM();
+  for (const p of state.periods) {
+    if (hhmm >= p.start_time && hhmm <= p.end_time) return p.period;
+  }
+  for (const p of state.periods) {
+    if (hhmm < p.start_time) return p.period;
+  }
+  return state.periods.length > 0 ? state.periods[state.periods.length - 1].period : 1;
+}
+
+function getPeriodInfo(period) {
+  return state.periods.find(p => p.period === period) || null;
+}
+
+function getSchedule(classId, period) {
+  return state.schedule[classId + '_' + period] || null;
+}
+
+// ============================================
+// 登录
+// ============================================
+function showLoginScreen() {
+  document.getElementById('loginScreen').classList.remove('screen-hidden');
+  document.getElementById('adminLoginScreen').classList.add('screen-hidden');
+  document.getElementById('mainApp').classList.add('screen-hidden');
+  populateGroupSelect();
+}
+function showAdminLogin() {
+  document.getElementById('loginScreen').classList.add('screen-hidden');
+  document.getElementById('adminLoginScreen').classList.remove('screen-hidden');
+  document.getElementById('adminPassword').value = '';
+  setTimeout(() => document.getElementById('adminPassword').focus(), 100);
+}
+function initLoginDept() {
+  const sel = document.getElementById('loginDept');
+  const grp = document.getElementById('loginDeptGroup');
+  if (!GRADE_CONFIG.depts) {
+    grp.style.display = 'none';
+    sel.innerHTML = '<option value="本级部">本级部</option>';
+    sel.value = '本级部';
+    return;
+  }
+  sel.innerHTML = '<option value="">请选择级部</option>' +
+    GRADE_CONFIG.depts.map(d => '<option value="' + d.name + '">' + deptRangeLabel(d) + '</option>').join('');
+}
+function populateGroupSelect() {
+  initLoginDept();
+  const sel = document.getElementById('loginGroup');
+  sel.innerHTML = '<option value="">请选择备课组</option>' +
+    PATROL_GROUPS.map(g => '<option value="' + g + '">' + g + '</option>').join('');
+  const lastGroup = localStorage.getItem(LAST_GROUP_KEY);
+  if (lastGroup && PATROL_GROUPS.includes(lastGroup)) {
+    sel.value = lastGroup;
+    updateTeacherList();
+  }
+}
+function updateTeacherList() {
+  const group = document.getElementById('loginGroup').value;
+  const sel = document.getElementById('loginTeacher');
+  if (!group) {
+    sel.innerHTML = '<option value="">请先选择备课组</option>';
+    return;
+  }
+  const teachers = state.teachers.filter(t => t.group_name === group);
+  if (teachers.length === 0) {
+    sel.innerHTML = '<option value="">该组暂无教师，请在设置中添加</option>';
+  } else {
+    sel.innerHTML = teachers.map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
+    const lastTeacher = localStorage.getItem(LAST_TEACHER_KEY);
+    if (lastTeacher && teachers.some(t => t.id === lastTeacher)) {
+      sel.value = lastTeacher;
+    }
+  }
+}
+function doLogin() {
+  const dept = GRADE_CONFIG.depts ? document.getElementById('loginDept').value : '本级部';
+  const groupId = document.getElementById('loginGroup').value;
+  const teacherId = document.getElementById('loginTeacher').value;
+  const teacherName = document.getElementById('loginTeacher').selectedOptions[0]?.text || '';
+  if (!dept || !groupId || !teacherId) {
+    showToast(GRADE_CONFIG.depts ? '请选择级部、备课组和教师' : '请选择备课组和教师', 'error');
+    return;
+  }
+  state.role = 'teacher';
+  state.teacher = teacherName;
+  state.group = groupId;
+  state.dept = dept;
+  localStorage.setItem(LAST_GROUP_KEY, groupId);
+  localStorage.setItem(LAST_TEACHER_KEY, teacherId);
+  showMainApp();
+}
+function doAdminLogin() {
+  const pwd = document.getElementById('adminPassword').value;
+  if (pwd !== ADMIN_PASSWORD) {
+    showToast('密码错误', 'error');
+    return;
+  }
+  state.role = 'admin';
+  state.teacher = '教务处';
+  state.group = '';
+  showMainApp();
+}
+
+function showMainApp() {
+  document.getElementById('loginScreen').classList.add('screen-hidden');
+  document.getElementById('adminLoginScreen').classList.add('screen-hidden');
+  document.getElementById('mainApp').classList.remove('screen-hidden');
+  document.getElementById('headerUser').textContent = state.role === 'admin' ? state.teacher : state.dept + ' · ' + state.teacher;
+  document.getElementById('headerDate').textContent = formatDateCN(state.viewDate) + ' 周' + getWeekday(state.viewDate);
+  const patrolDateInput = document.getElementById('patrolDate');
+  if (patrolDateInput) { patrolDateInput.value = state.viewDate; patrolDateInput.max = todayStr(); }
+  // Initialize period selector
+  populatePeriodSelect();
+  // Auto-detect current period
+  const detected = detectCurrentPeriod();
+  state.currentPeriod = detected;
+  document.getElementById('periodSelect').value = detected;
+  updatePeriodTime();
+  // Hide settings tab for teachers
+  const settingsTab = document.querySelector('[data-tab="settings"]');
+  settingsTab.style.display = state.role === 'admin' ? '' : 'none';
+  const statsTab = document.querySelector('[data-tab="stats"]');
+  statsTab.style.display = state.role === 'admin' ? '' : 'none';
+  const issuesTab = document.querySelector('[data-tab="issues"]');
+  issuesTab.style.display = state.role === 'admin' ? '' : 'none';
+  // Load data and render
+  loadPatrolRecords(state.viewDate).then(() => {
+    loadPatrolPhotos(state.viewDate, state.currentPeriod).then(() => {
+      renderPatrol();
+    });
+  });
+  // Set summary/feedback date
+  document.getElementById('summaryDate').value = state.viewDate;
+  document.getElementById('feedbackDate').value = state.viewDate;
+}
+
+function populatePeriodSelect() {
+  const sel = document.getElementById('periodSelect');
+  sel.innerHTML = state.periods.map(p =>
+    '<option value="' + p.period + '">' + p.label + ' (' + p.start_time + '-' + p.end_time + ')</option>'
+  ).join('');
+}
+function updatePeriodTime() {
+  const info = getPeriodInfo(state.currentPeriod);
+  document.getElementById('periodTime').textContent = info ? info.start_time + ' - ' + info.end_time : '';
+}
+function onPeriodChange() {
+  state.currentPeriod = parseInt(document.getElementById('periodSelect').value);
+  updatePeriodTime();
+  loadPatrolPhotos(state.viewDate, state.currentPeriod).then(() => {
+    renderPatrol();
+  });
+}
+
+// ============================================
+// 级部判断与过滤
+// ============================================
+// 级部判断：按 GRADE_CONFIG.depts 的班级号范围计算；单级部配置(depts=null)时全部归入本级部
+function deptOfClass(name) {
+  if (!GRADE_CONFIG.depts) return '本级部';
+  const n = parseInt(String(name).replace(/\D/g, ''), 10) % 100;
+  const d = GRADE_CONFIG.depts.find(x => n >= x.min && n <= x.max);
+  return d ? d.name : GRADE_CONFIG.depts[0].name;
+}
+function visibleClasses() {
+  if (state.role === 'admin') return state.classes;
+  return state.classes.filter(c => deptOfClass(c.name) === state.dept);
+}
+function currentDeptLabel() {
+  if (state.role === 'admin') return GRADE_CONFIG.depts ? '两级部' : '全年级';
+  return state.dept;
+}
+
+// ============================================
+// 巡课渲染
+// ============================================
+async function renderPatrol() {
+  const container = document.getElementById('patrolList');
+  const progressEl = document.getElementById('patrolProgress');
+  // 显示并加载其他备注
+  const noteBox = document.getElementById('dailyNoteBox');
+  const noteInput = document.getElementById('dailyNoteInput');
+  if (noteBox) noteBox.classList.remove('screen-hidden');
+  if (noteInput) {
+    if (state.lastNoteDate !== state.viewDate) {
+      state.lastNoteDate = state.viewDate;
+      noteInput.dataset.loaded = '';
+      noteInput.value = '';
+    }
+    if (!noteInput.dataset.loaded) {
+      noteInput.dataset.loaded = '1';
+      loadDailyNote(state.viewDate).then(n => { if (noteInput && !noteInput.dataset.editing) noteInput.value = n; }).catch(() => {});
+    }
+  }
+  if (visibleClasses().length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="text">暂无班级</div><div class="hint">请在「设置」中添加班级</div></div>';
+    return;
+  }
+  // Render cards
+  container.innerHTML = visibleClasses().map(cls => {
+    const key = cls.id + '_' + state.currentPeriod;
+    const rec = state.records[key] || { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+    const sched = getSchedule(cls.id, state.currentPeriod);
+    const subject = sched ? sched.subject : '';
+    const teacher = sched ? sched.teacher_name : '';
+    const photos = state.photos[key] || [];
+    const cardHtml = renderClassCard(cls, rec, subject, teacher, photos);
+  const isChecked = Object.keys(rec.scores || {}).length > 0 || rec.special || rec.remark;
+  return cardHtml.replace('class="class-card"', 'class="class-card' + (isChecked ? ' card-checked' : ' card-unchecked') + '"');
+  }).join('');
+}
+
+function renderClassCard(cls, rec, subject, teacher, photos) {
+  const period = state.currentPeriod;
+  const cid = cls.id;
+  const special = rec.special || '';
+  let html = '<div class="class-card" id="card_' + cid + '_' + period + '">';
+  // Header
+  html += '<div class="card-header">';
+  html += '<div><div class="class-name">' + cls.name + '</div>';
+  if (subject || teacher) {
+    html += '<div class="subject-teacher">' + (subject || '未配置') + (teacher ? ' · ' + teacher : '') + '</div>';
+  } else {
+    html += '<div class="class-info">课表未配置</div>';
+  }
+  html += '</div>';
+  // Photo button
+  html += '<div class="photo-btn-wrap">';
+  html += '<label class="photo-btn">📷<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPhotoSelected(\'' + cid + '\',' + period + ',this)"></label>';
+  html += '</div>';
+  html += '</div>';
+
+  // Special situation badge or scoring
+  if (special) {
+    html += '<div class="special-badge ' + special + '">' + (SPECIAL_DISPLAY[special] ? SPECIAL_DISPLAY[special].badge : special) + '</div>';
+  } else {
+    // Score items
+    SCORE_ITEMS.forEach(item => {
+      const grade = rec.scores[item] || 'A';
+      const reason = rec.reasons[item] || '';
+      html += '<div class="score-row">';
+      html += '<span class="item-name">' + item + '</span>';
+      html += '<div class="grade-btns">';
+      SCORE_GRADES.forEach(g => {
+        const active = g === grade ? ' active' : '';
+        html += '<button class="grade-btn grade-' + g.toLowerCase() + active + '" onclick="setScore(\'' + cid + '\',' + period + ',\'' + item + '\',\'' + g + '\')">' + g + '</button>';
+      });
+      html += '</div>';
+      html += '</div>';
+      // Reason input for B/C
+      if (grade !== 'A') {
+        const tags = (REASON_TAGS[item + '_' + grade] || []);
+        if (tags.length) {
+          const reasonsArr = (reason || '').split(/[,，、]/).map(x => x.trim()).filter(Boolean);
+          html += '<div class="reason-tags">';
+          tags.forEach(t => {
+            html += '<span class="reason-tag' + (reasonsArr.indexOf(t) >= 0 ? ' active' : '') + '" onclick="toggleReasonTag(\'' + cid + '\',' + period + ',\'' + item + '\',\'' + t + '\')">' + t + '</span>';
+          });
+          html += '</div>';
+        }
+        html += '<input class="reason-input" placeholder="' + item + '：请简述原因..." value="' + escapeAttr(reason) + '" onchange="setReason(\'' + cid + '\',' + period + ',\'' + item + '\',this.value)">';
+      }
+    });
+  }
+
+  // Special situation selector
+  html += '<div class="special-row">';
+  html += '<span style="font-size:13px;color:var(--text2)">特殊情况</span>';
+  html += '<select onchange="setSpecial(\'' + cid + '\',' + period + ',this.value)">';
+  SPECIAL_OPTIONS.forEach(opt => {
+    html += '<option value="' + opt.value + '"' + (special === opt.value ? ' selected' : '') + '>' + opt.label + '</option>';
+  });
+  html += '</select>';
+  html += '<span class="duty-tag' + (rec.scores && rec.scores['_banzhuren'] ? ' active' : '') + '" onclick="toggleDuty(\'' + cid + '\',' + period + ')">👨‍🏫 班主任坐班</span>';
+
+  // Photo thumbnails with delete button
+  if (photos.length > 0) {
+    photos.forEach((ph, idx) => {
+      html += '<div style="position:relative;display:inline-block">';
+      html += '<img class="photo-thumb" src="' + ph.url + '" onclick="showPhoto(\'' + ph.id + '\',\'' + cid + '\',' + period + ',' + idx + ')">';
+      html += '<span style="position:absolute;top:-4px;right:-4px;width:18px;height:18px;background:var(--red);color:#fff;border-radius:50%;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1" onclick="event.stopPropagation();deletePhoto(\'' + cid + '\',' + period + ',' + idx + ')">×</span>';
+      html += '</div>';
+    });
+  }
+
+  html += '</div>';
+
+  // Remark
+  html += '<div class="card-bottom">';
+  html += '<input class="remark-input" placeholder="备注（可选）..." value="' + escapeAttr(rec.remark) + '" onchange="setRemark(\'' + cid + '\',' + period + ',this.value)">';
+  html += '<span class="save-indicator" id="save_' + cid + '_' + period + '"></span>';
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+function escapeAttr(s) {
+  if (!s) return '';
+  return s.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ============================================
+// 打分操作 (乐观更新)
+// ============================================
+async function setScore(classId, period, item, grade) {
+  const key = classId + '_' + period;
+  if (!state.records[key]) state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+  const rec = state.records[key];
+  const oldGrade = rec.scores[item] || 'A';
+
+  // Optimistic update
+  if (grade === 'A') {
+    delete rec.scores[item];
+    delete rec.reasons[item];
+  } else {
+    rec.scores[item] = grade;
+  }
+  rec.inspector = state.teacher;
+
+  // Re-render card
+  renderPatrolCard(classId, period);
+  schedulePatrolSave(state.viewDate, classId, period);
+}
+
+async function setReason(classId, period, item, reason) {
+  const key = classId + '_' + period;
+  if (!state.records[key]) state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+  const rec = state.records[key];
+  if (reason) { rec.reasons[item] = reason; } else { delete rec.reasons[item]; }
+  rec.inspector = state.teacher;
+  schedulePatrolSave(state.viewDate, classId, period);
+}
+
+async function loadDailyNote(dateStr) {
+  const { data } = await sb.from(TB('patrol_records'))
+    .select('remark').eq('date', dateStr).eq('class_id', '__daily__').eq('period', 0).maybeSingle();
+  return data ? (data.remark || '') : '';
+}
+function onDailyNoteInput() {
+  const el = document.getElementById('dailyNoteInput');
+  if (!el) return;
+  el.dataset.editing = '1';
+  clearTimeout(window.__dailyNoteTimer);
+  window.__dailyNoteTimer = setTimeout(async () => {
+    const val = el.value;
+    const st = document.getElementById('dailyNoteStatus');
+    if (st) st.textContent = '保存中...';
+    try {
+      await savePatrolRecord(state.viewDate, '__daily__', 0, { remark: val, has_photo: false, inspector: state.teacher });
+      if (st) st.textContent = '✓ 已保存 ' + new Date().toLocaleTimeString().substring(0, 5);
+    } catch (e) {
+      if (st) st.textContent = '保存失败，请重试';
+    }
+  }, 1500);
+}
+
+function toggleReasonTag(classId, period, item, tag) {
+  const key = classId + '_' + period;
+  if (!state.records[key]) state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+  const rec = state.records[key];
+  if (!rec.reasons) rec.reasons = {};
+  const reasons = (rec.reasons[item] || '').split(/[,，、]/).map(x => x.trim()).filter(Boolean);
+  const idx = reasons.indexOf(tag);
+  if (idx >= 0) reasons.splice(idx, 1);
+  else reasons.push(tag);
+  rec.reasons[item] = reasons.join('、');
+  schedulePatrolSave(state.viewDate, classId, period);
+  renderPatrol();
+}
+
+function toggleDuty(classId, period) {
+  const key = classId + '_' + period;
+  if (!state.records[key]) state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+  const rec = state.records[key];
+  if (!rec.scores) rec.scores = {};
+  if (rec.scores['_banzhuren']) {
+    delete rec.scores['_banzhuren'];
+  } else {
+    rec.scores['_banzhuren'] = '1';
+  }
+  schedulePatrolSave(state.viewDate, classId, period);
+  renderPatrolCard(classId, period);
+}
+
+async function setSpecial(classId, period, special) {
+  const key = classId + '_' + period;
+  if (!state.records[key]) state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+  const rec = state.records[key];
+  const oldSpecial = rec.special || '';
+  const oldScores = JSON.parse(JSON.stringify(rec.scores || {}));
+  const oldReasons = JSON.parse(JSON.stringify(rec.reasons || {}));
+  rec.special = special || null;
+  // Don't clear scores, just hide them when special; restore when switching back
+  if (special) {
+    // Store current scores in _backup for potential restore
+    rec._backup = { scores: oldScores, reasons: oldReasons };
+  } else {
+    // If switching back to normal and have backup, restore
+    if (rec._backup) {
+      rec.scores = rec._backup.scores || {};
+      rec.reasons = rec._backup.reasons || {};
+      delete rec._backup;
+    }
+  }
+  rec.inspector = state.teacher;
+  renderPatrolCard(classId, period);
+  schedulePatrolSave(state.viewDate, classId, period);
+}
+
+async function setRemark(classId, period, remark) {
+  const key = classId + '_' + period;
+  if (!state.records[key]) state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+  const rec = state.records[key];
+  rec.remark = remark;
+  rec.inspector = state.teacher;
+  schedulePatrolSave(state.viewDate, classId, period);
+}
+
+function renderPatrolCard(classId, period) {
+  const key = classId + '_' + period;
+  const rec = state.records[key] || { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+  const cls = state.classes.find(c => c.id === classId);
+  if (!cls) return;
+  const sched = getSchedule(classId, period);
+  const subject = sched ? sched.subject : '';
+  const teacher = sched ? sched.teacher_name : '';
+  const photos = state.photos[key] || [];
+  const cardEl = document.getElementById('card_' + classId + '_' + period);
+  if (cardEl) {
+    cardEl.outerHTML = renderClassCard(cls, rec, subject, teacher, photos);
+  }
+}
+
+function showSaveStatus(classId, period, status) {
+  const el = document.getElementById('save_' + classId + '_' + period);
+  if (!el) return;
+  el.className = 'save-indicator ' + status;
+  if (status === 'saving') el.textContent = '保存中...';
+  else if (status === 'saved') { el.textContent = '已保存'; setTimeout(() => { if (el) el.textContent = ''; }, 2000); }
+  else if (status === 'error') el.textContent = '保存失败';
+}
+
+// ============================================
+// 一键全A
+// ============================================
+// 通用确认弹层（兼容 QQ 等内嵌浏览器，不使用原生 confirm）
+let _confirmCb = null;
+function showConfirm(title, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  _confirmCb = cb;
+  document.getElementById('confirmOverlay').style.display = 'flex';
+}
+function cancelConfirm() {
+  _confirmCb = null;
+  document.getElementById('confirmOverlay').style.display = 'none';
+}
+function doConfirm() {
+  const cb = _confirmCb;
+  _confirmCb = null;
+  document.getElementById('confirmOverlay').style.display = 'none';
+  if (cb) cb();
+}
+
+async function resetAllToA() {
+  showConfirm('确定将所有班级标记为A吗？', async function() {
+    for (const cls of visibleClasses()) {
+      const key = cls.id + '_' + state.currentPeriod;
+      state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false, inspector: state.teacher };
+      try {
+        await savePatrolRecord(state.viewDate, cls.id, state.currentPeriod, state.records[key]);
+      } catch (err) {
+        showToast('保存失败：' + err.message, 'error');
+        return;
+      }
+    }
+    renderPatrol();
+    showToast('已全部标记为A', 'success');
+  });
+}
+
+async function resetAllToOutdoor() {
+  showConfirm('确定将所有班级标记为室外体育课吗？', async function() {
+    for (const cls of visibleClasses()) {
+      const key = cls.id + '_' + state.currentPeriod;
+      state.records[key] = { scores: {}, reasons: {}, remark: '', special: '室外体育课', has_photo: false, inspector: state.teacher };
+      try {
+        await savePatrolRecord(state.viewDate, cls.id, state.currentPeriod, state.records[key]);
+      } catch (err) {
+        showToast('保存失败：' + err.message, 'error');
+        return;
+      }
+    }
+    renderPatrol();
+    showToast('已全部标记为室外体育课', 'success');
+  });
+}
+
+// ============================================
+// 拍照上传
+// ============================================
+function dataURLtoBlob(dataURL) {
+  const arr = dataURL.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  const n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  for (let i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
+  return new Blob([u8arr], { type: mime });
+}
+function getPhotoUrl(path) {
+  if (!path) return '';
+  const { data } = sb.storage.from('patrol-photos').getPublicUrl(path);
+  return data.publicUrl;
+}
+async function compressImage(file, maxWidth, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function onPhotoSelected(classId, period, input) {
+  const file = input.files[0];
+  if (!file) return;
+  showLoading('压缩图片...');
+  try {
+    const compressed = await compressImage(file, 400, 0.4);
+    const photoId = 'ph_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+    // Upload compressed image to Supabase Storage
+    const blob = dataURLtoBlob(compressed);
+    const filePath = state.viewDate + '/' + classId + '_' + period + '_' + photoId + '.jpg';
+    const { error: upErr } = await sb.storage.from('patrol-photos').upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
+    if (upErr) throw upErr;
+    const photoUrl = getPhotoUrl(filePath);
+    // Insert photo record with storage path
+    const { error } = await sb.from(TB('patrol_photos')).insert({
+      id: photoId,
+      date: state.viewDate,
+      class_id: classId,
+      period: period,
+      photo_path: filePath
+    });
+    if (error) throw error;
+    // Update record has_photo
+    const key = classId + '_' + period;
+    if (!state.records[key]) state.records[key] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+    state.records[key].has_photo = true;
+    state.records[key].inspector = state.teacher;
+    await savePatrolRecord(state.viewDate, classId, period, state.records[key]);
+    // Update local cache
+    if (!state.photos[key]) state.photos[key] = [];
+    state.photos[key].push({ id: photoId, path: filePath, url: photoUrl });
+    hideLoading();
+    renderPatrolCard(classId, period);
+    showToast('照片已上传', 'success');
+  } catch (err) {
+    hideLoading();
+    showToast('上传失败：' + err.message, 'error');
+  }
+  input.value = '';
+}
+
+async function deletePhoto(classId, period, photoIdx) {
+  if (!confirm('确定删除这张照片吗？')) return;
+  const key = classId + '_' + period;
+  const photos = state.photos[key] || [];
+  const ph = photos[photoIdx];
+  if (!ph) return;
+  try {
+    // Remove storage object if path exists
+    if (ph.path) {
+      await sb.storage.from('patrol-photos').remove([ph.path]);
+    }
+    const { error } = await sb.from(TB('patrol_photos')).delete().eq('id', ph.id);
+    if (error) throw error;
+    state.photos[key].splice(photoIdx, 1);
+    // Update has_photo flag
+    if (state.photos[key].length === 0) {
+      const rec = state.records[key];
+      if (rec) { rec.has_photo = false; await savePatrolRecord(state.viewDate, classId, period, rec); }
+    }
+    renderPatrolCard(classId, period);
+    showToast('照片已删除', 'success');
+  } catch (err) {
+    showToast('删除失败：' + err.message, 'error');
+  }
+}
+
+function showPhotoByIdx(classId, period, idx) {
+  const key = classId + '_' + period;
+  const photos = state.photos[key] || [];
+  const ph = photos[idx];
+  if (!ph) return;
+  document.getElementById('photoModalImg').src = ph.url;
+  document.getElementById('photoModal').classList.remove('screen-hidden');
+}
+
+function showPhoto(photoId, classId, period, idx) {
+  const key = classId + '_' + period;
+  const photos = state.photos[key] || [];
+  const ph = photos[idx];
+  if (!ph) return;
+  document.getElementById('photoModalImg').src = ph.url;
+  document.getElementById('photoModal').classList.remove('screen-hidden');
+}
+function closePhotoModal(e) {
+  if (e.target === e.currentTarget || e.target.classList.contains('close-btn')) {
+    document.getElementById('photoModal').classList.add('screen-hidden');
+  }
+}
+
+// ============================================
+// 汇总 Tab
+// ============================================
+async function renderSummary() {
+  state.summaryDate = document.getElementById('summaryDate').value || todayStr();
+  const container = document.getElementById('summaryGrid');
+  const statsEl = document.getElementById('summaryStats');
+  container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">加载中...</div>';
+
+  try {
+    await loadPatrolRecords(state.summaryDate);
+    // Render stats（按级部分组统计）
+    const visCls = visibleClasses();
+    const deptList = state.role === 'admin' ? (GRADE_CONFIG.depts ? GRADE_CONFIG.depts.map(d => d.name) : ['本级部']) : [state.dept];
+    let statsHtml = '';
+    let gTotal = 0, gA = 0, gB = 0, gC = 0, gSp = 0;
+    deptList.forEach(d => {
+      const dcls = visCls.filter(c => deptOfClass(c.name) === d);
+      let totalChecked = 0, totalItems = 0, a = 0, b = 0, c = 0, special = 0;
+      dcls.forEach(cls => {
+        state.periods.forEach(p => {
+          const key = cls.id + '_' + p.period;
+          const rec = state.records[key];
+          if (rec) {
+            totalChecked++;
+            if (rec.special) { special++; return; }
+            SCORE_ITEMS.forEach(item => {
+              totalItems++;
+              const grade = rec.scores[item] || 'A';
+              if (grade === 'A') a++;
+              else if (grade === 'B') b++;
+              else if (grade === 'C') c++;
+            });
+          }
+        });
+      });
+      gTotal += totalChecked; gA += a; gB += b; gC += c; gSp += special;
+      const unchecked = dcls.length * state.periods.length - totalChecked;
+      statsHtml += `<div class="dept-stats">
+        <div class="dept-label">${d}（${dcls.length}班）</div>
+        <div class="dept-cards">
+          <div class="stat-card"><div class="num" style="color:var(--primary)">${totalChecked}</div><div class="lbl">已巡课</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--green)">${a}</div><div class="lbl">A项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--orange)">${b}</div><div class="lbl">B项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--red)">${c}</div><div class="lbl">C项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--purple)">${special}</div><div class="lbl">特殊情况</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--text2)">${unchecked}</div><div class="lbl">未巡课</div></div>
+        </div>
+      </div>`;
+    });
+    if (state.role === 'admin') {
+      statsHtml += `<div class="dept-stats dept-total">
+        <div class="dept-label">${GRADE_CONFIG.depts ? '两级部' : '全年级'}合计（${visCls.length}班）</div>
+        <div class="dept-cards">
+          <div class="stat-card"><div class="num" style="color:var(--primary)">${gTotal}</div><div class="lbl">已巡课</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--green)">${gA}</div><div class="lbl">A项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--orange)">${gB}</div><div class="lbl">B项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--red)">${gC}</div><div class="lbl">C项</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--purple)">${gSp}</div><div class="lbl">特殊情况</div></div>
+          <div class="stat-card"><div class="num" style="color:var(--text2)">${visCls.length * state.periods.length - gTotal}</div><div class="lbl">未巡课</div></div>
+        </div>
+      </div>`;
+    }
+    statsEl.innerHTML = statsHtml;
+
+    // Render grid
+    let html = '<table class="summary-table"><thead><tr><th>班级</th>';
+    // Add period columns
+    state.periods.forEach(p => {
+      html += '<th>' + p.label + '<br><span style="font-size:10px;font-weight:400">' + p.start_time + '</span></th>';
+    });
+    html += '<th>巡课人</th>';
+    html += '</tr></thead><tbody>';
+    visibleClasses().forEach(cls => {
+      html += '<tr><td class="class-col">' + (state.role === 'admin' ? '<span class="dept-badge">' + deptOfClass(cls.name) + '</span>' : '') + cls.name + '</td>';
+      state.periods.forEach(p => {
+        const key = cls.id + '_' + p.period;
+        const rec = state.records[key];
+        const duty = rec && rec.scores && rec.scores['_banzhuren'] ? ' 👨\u200d🏫' : '';
+        if (!rec) {
+          html += '<td class="cell-none">-</td>';
+        } else if (rec.special) {
+          html += '<td class="cell-special">' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) + duty + '</td>';
+        } else {
+          const grades = SCORE_ITEMS.map(item => {
+            const g = rec.scores[item] || 'A';
+            const cls2 = g === 'A' ? 'cell-a' : (g === 'B' ? 'cell-b' : 'cell-c');
+            return '<span class="' + cls2 + '">' + g + '</span>';
+          });
+          let cellClass = '';
+          if (rec.remark) cellClass += ' cell-has-remark';
+          if (rec.has_photo) cellClass += ' cell-has-photo';
+          html += '<td class="' + cellClass.trim() + '" style="cursor:pointer" onclick="showCellDetail(\'' + cls.id + '\',' + p.period + ')">' + grades.join(' ') + (rec.has_photo ? ' 📷' : '') + duty + '</td>';
+        }
+      });
+      // Show inspectors for this class
+      const inspectors = new Set();
+      state.periods.forEach(p => {
+        const r = state.records[cls.id + '_' + p.period];
+        if (r && r.inspector) inspectors.add(r.inspector);
+      });
+      html += '<td style="font-size:11px;color:var(--text2)">' + (inspectors.size > 0 ? Array.from(inspectors).join('、') : '-') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red)">加载失败：' + err.message + '</div>';
+  }
+}
+
+async function showCellDetail(classId, period) {
+  const key = classId + '_' + period;
+  const rec = state.records[key];
+  if (!rec) return;
+  const cls = state.classes.find(c => c.id === classId);
+  const p = getPeriodInfo(period);
+  const sched = getSchedule(classId, period);
+  let html = '<div style="margin-bottom:12px">';
+  html += '<span style="font-size:18px;font-weight:600">' + (cls ? cls.name : '') + '</span>';
+  html += '<span style="margin-left:8px;color:var(--text2)">' + (p ? p.label : '') + '</span>';
+  if (sched && sched.subject) html += '<span style="margin-left:8px;color:var(--primary)">' + sched.subject + (sched.teacher_name ? ' · ' + sched.teacher_name : '') + '</span>';
+  html += '</div>';
+  if (rec.special) {
+    html += '<div class="special-badge ' + rec.special + '">' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].badge : rec.special) + '</div>';
+  } else {
+    html += '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px">';
+    html += '<thead><tr style="background:var(--primary-light);color:var(--primary-dark)"><th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:left">项目</th><th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:center;width:60px">等级</th><th style="padding:6px 8px;border:1px solid #d6e4ff;text-align:left">原因</th></tr></thead><tbody>';
+    SCORE_ITEMS.forEach(item => {
+      const g = rec.scores[item] || 'A';
+      const reason = rec.reasons[item] || '';
+      const color = g === 'A' ? 'var(--green)' : (g === 'B' ? 'var(--orange)' : 'var(--red)');
+      html += '<tr><td style="padding:6px 8px;border:1px solid #f0f0f0">' + item + '</td>';
+      html += '<td style="padding:6px 8px;border:1px solid #f0f0f0;text-align:center;font-weight:600;color:' + color + '">' + g + '</td>';
+      html += '<td style="padding:6px 8px;border:1px solid #f0f0f0">' + (reason || '-') + '</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  if (rec.remark) html += '<div style="margin-bottom:8px;padding:8px;background:#fffbe6;border-radius:6px;font-size:13px"><b>备注：</b>' + rec.remark + '</div>';
+  if (rec.inspector) html += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">巡课人：' + rec.inspector + '</div>';
+  // Photos
+  const photos = state.photos[key] || [];
+  if (photos.length > 0) {
+    html += '<div style="font-size:13px;margin-bottom:6px;font-weight:500">📸 照片(' + photos.length + ')</div>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    photos.forEach((ph, idx) => {
+      html += '<img class="photo-thumb" src="' + ph.url + '" onclick="showPhoto(\'\',\'\'' + classId + '\',' + period + ',' + idx + ')" style="width:80px;height:80px">';
+    });
+    html += '</div>';
+  }
+  // Show in modal
+  const modal = document.getElementById('detailModal');
+  document.getElementById('detailModalBody').innerHTML = html;
+  modal.classList.remove('screen-hidden');
+}
+function closeDetailModal(e) {
+  if (e.target === e.currentTarget || e.target.classList.contains('detail-close')) {
+    document.getElementById('detailModal').classList.add('screen-hidden');
+  }
+}
+
+// ============================================
+// 反馈 Tab
+// ============================================
+async function renderFeedback() {
+  state.feedbackDate = document.getElementById('feedbackDate').value || todayStr();
+  try {
+    await loadPatrolRecords(state.feedbackDate);
+    const { data } = await sb.from(TB('patrol_summary')).select('*').eq('date', state.feedbackDate).maybeSingle();
+    document.getElementById('goodPoints').value = (data && data.good_points) || '';
+    document.getElementById('issues').value = (data && data.issues) || '';
+    document.getElementById('summaryText').value = (data && data.summary_text) || '';
+  } catch (err) {
+    showToast('加载失败：' + err.message, 'error');
+  }
+}
+
+function generateFeedback() {
+  const date = state.feedbackDate;
+  const weekday = getWeekday(date);
+  let goodArr = [];
+  let issueArr = [];
+  let totalChecked = 0, totalB = 0, totalC = 0, totalSpecial = 0;
+
+  visibleClasses().forEach(cls => {
+    let classHasB = false, classHasC = false, classAllA = true, classSpecial = '';
+    let classIssues = [];
+    state.periods.forEach(p => {
+      const key = cls.id + '_' + p.period;
+      const rec = state.records[key];
+      if (!rec) return;
+      totalChecked++;
+      if (rec.special) { totalSpecial++; classSpecial = rec.special; classAllA = false; return; }
+      SCORE_ITEMS.forEach(item => {
+        const g = rec.scores[item] || 'A';
+        if (g === 'B') { totalB++; classHasB = true; classAllA = false; classIssues.push(p.label + item + '为B' + (rec.reasons[item] ? '：' + rec.reasons[item] : '')); }
+        if (g === 'C') { totalC++; classHasC = true; classAllA = false; classIssues.push(p.label + item + '为C' + (rec.reasons[item] ? '：' + rec.reasons[item] : '')); }
+      });
+      if (rec.remark) classIssues.push(p.label + '备注：' + rec.remark);
+    });
+    if (classAllA && !classSpecial) {
+      goodArr.push(cls.name + '全时段各项均为A');
+    }
+    if (classSpecial) {
+      issueArr.push(cls.name + '：' + (classSpecial === '开会' ? '开年级大会' : '学生自习'));
+    }
+    if (classIssues.length > 0) {
+      issueArr.push(cls.name + '：' + classIssues.join('；'));
+    }
+  });
+
+  let good = goodArr.length > 0 ? goodArr.join('\n') : '暂无';
+  let issues = issueArr.length > 0 ? issueArr.join('\n') : '暂无';
+  let summary = formatDateCN(date) + '（周' + weekday + '）巡堂情况：\n';
+  summary += '共巡课' + totalChecked + '班次，其中A等级为主，B等级' + totalB + '项，C等级' + totalC + '项，特殊情况' + totalSpecial + '班次。\n';
+  if (totalB + totalC > 0) {
+    summary += '需关注存在B/C等级的班级，建议跟进整改。';
+  } else {
+    summary += '整体情况良好。';
+  }
+
+  document.getElementById('goodPoints').value = good;
+  document.getElementById('issues').value = issues;
+  document.getElementById('summaryText').value = summary;
+  showToast('已自动生成反馈内容，请检查并修改', 'success');
+}
+
+async function saveFeedback() {
+  const data = {
+    date: state.feedbackDate,
+    good_points: document.getElementById('goodPoints').value,
+    issues: document.getElementById('issues').value,
+    summary_text: document.getElementById('summaryText').value,
+    inspector: state.teacher,
+    updated_at: new Date().toISOString()
+  };
+  try {
+    const { error } = await sb.from(TB('patrol_summary')).upsert(data, { onConflict: 'date' });
+    if (error) throw error;
+    showToast('反馈已保存', 'success');
+  } catch (err) {
+    showToast('保存失败：' + err.message, 'error');
+  }
+}
+
+
+function exportFeedbackWord() {
+  const date = state.feedbackDate;
+  const weekday = getWeekday(date);
+  let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">';
+  html += '<head><meta charset="utf-8"><title>巡堂反馈</title><style>';
+  html += 'body { font-family: "宋体", SimSun, serif; font-size: 14pt; line-height: 1.8; }';
+  html += 'h1 { text-align: center; font-size: 18pt; margin-bottom: 4pt; }';
+  html += 'h2 { font-size: 14pt; margin-top: 16pt; border-bottom: 1px solid #000; padding-bottom: 4pt; }';
+  html += '.subtitle { text-align: center; color: #666; font-size: 12pt; margin-bottom: 16pt; }';
+  html += 'table { width: 100%; border-collapse: collapse; font-size: 11pt; margin: 8pt 0; }';
+  html += 'th, td { border: 1px solid #000; padding: 4pt 6pt; text-align: center; }';
+  html += 'th { background: #e6f4ff; }';
+  html += '.section { margin-top: 12pt; }';
+  html += '.good { color: #52c41a; }';
+  html += '.bad { color: #ff4d4f; }';
+  html += '</style></head><body>';
+  html += '<h1>武汉市二桥中学巡堂反馈</h1>';
+  html += '<div class="subtitle">' + date + '（周' + weekday + '） · 巡课人：' + (state.teacher || '') + '</div>';
+  
+  // Summary table
+  html += '<h2>巡课汇总表</h2><table><thead><tr><th>班级</th>';
+  state.periods.forEach(p => { html += '<th>' + p.label + '</th>'; });
+  html += '<th>巡课人</th></tr></thead><tbody>';
+  visibleClasses().forEach(cls => {
+    html += '<tr><td>' + cls.name + '</td>';
+    const inspectors = new Set();
+    state.periods.forEach(p => {
+      const rec = state.records[cls.id + '_' + p.period];
+      if (!rec) { html += '<td>-</td>'; return; }
+      if (rec.inspector) inspectors.add(rec.inspector);
+      if (rec.special) { html += '<td>' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) + '</td>'; return; }
+      const grades = SCORE_ITEMS.map(item => { const g = rec.scores[item] || 'A'; return g; }).join('/');
+      html += '<td>' + grades + '</td>';
+    });
+    html += '<td style="font-size:10pt">' + (inspectors.size > 0 ? Array.from(inspectors).join('、') : '-') + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  
+  // Good points
+  html += '<div class="section"><h2>好的方面</h2><p style="white-space:pre-wrap">' + (document.getElementById('goodPoints').value || '暂无') + '</p></div>';
+  // Issues
+  html += '<div class="section"><h2>不足之处</h2><p style="white-space:pre-wrap">' + (document.getElementById('issues').value || '暂无') + '</p></div>';
+  // Summary
+  html += '<div class="section"><h2>巡堂总结</h2><p style="white-space:pre-wrap">' + (document.getElementById('summaryText').value || '暂无') + '</p></div>';
+  html += '<div style="text-align:right;margin-top:24pt">巡课人：' + (state.teacher || '') + '</div>';
+  html += '<div style="text-align:right;color:#999;font-size:11pt">生成时间：' + new Date().toLocaleString() + '</div>';
+  html += '</body></html>';
+  
+  const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '巡堂反馈_' + date + '.doc';
+  a.click();
+}
+
+function exportFeedback() {
+  const date = state.feedbackDate;
+  let csv = '\uFEFF武汉市二桥中学巡堂反馈\n';
+  csv += '日期,' + date + '(周' + getWeekday(date) + ')\n\n';
+  csv += '好的方面\n' + document.getElementById('goodPoints').value + '\n\n';
+  csv += '不足之处\n' + document.getElementById('issues').value + '\n\n';
+  csv += '巡堂总结\n' + document.getElementById('summaryText').value + '\n\n';
+  csv += '巡课人,' + (state.teacher || '') + '\n';
+  csv += '生成时间,' + new Date().toLocaleString() + '\n';
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '巡堂反馈_' + date + '.csv';
+  a.click();
+}
+
+// ============================================
+// 汇总导出
+// ============================================
+async function exportStatsExcel() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const range = document.getElementById('statsRange').value;
+  const rangeLabel = range === 'today' ? '当天' : (range === 'week' ? '本周' : '本月');
+  const dates = getStatsDates(range);
+  if (dates.length === 0) { showToast('所选范围暂无数据', 'error'); return; }
+  showLoading('正在导出...');
+  try {
+    const allData = {};
+    for (const d of dates) {
+      const { data } = await sb.from(TB('patrol_records')).select('*').eq('date', d);
+      const records = {};
+      if (data) data.forEach(r => { records[r.class_id + '_' + r.period] = r; });
+      allData[d] = records;
+    }
+    // Sheet1: 巡课明细
+    const detailRows = [];
+    const visCls = visibleClasses();
+    dates.forEach(d => {
+      visCls.forEach(cls => {
+        state.periods.forEach(p => {
+          const rec = allData[d] && allData[d][cls.id + '_' + p.period];
+          if (rec) {
+            const reasons = Object.entries(rec.reasons || {}).map(([k,v]) => k + ':' + v).join('; ');
+            detailRows.push({
+              '日期': d, '班级': cls.name, '节次': p.label,
+              '时间': p.start_time + '-' + p.end_time,
+              '教室环境': rec.scores && rec.scores['教室环境'] || 'A',
+              '课堂纪律': rec.scores && rec.scores['课堂纪律'] || 'A',
+              '学习状态': rec.scores && rec.scores['学习状态'] || 'A',
+              '原因': reasons,
+              '特殊情况': rec.special ? (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) : '',
+              '班主任坐班': (rec.scores && rec.scores['_banzhuren']) ? '是' : '',
+              '备注': rec.remark || '', '巡课人': rec.inspector || ''
+            });
+          }
+        });
+      });
+    });
+    // Sheet2: 班级汇总
+    const sumRows = visCls.map(cls => {
+      let checked=0, a=0, b=0, c=0, sp=0, duty=0;
+      dates.forEach(d => state.periods.forEach(p => {
+        const rec = allData[d] && allData[d][cls.id + '_' + p.period];
+        if (rec) { checked++; if (rec.special) sp++; SCORE_ITEMS.forEach(it=>{const g=(rec.scores[it]||'A'); if(g==='A')a++; else if(g==='B')b++; else c++;}); if (rec.scores && rec.scores['_banzhuren']) duty++; }
+      }));
+      return { '班级': cls.name, '级部': deptOfClass(cls.name), '已巡课': checked, 'A项': a, 'B项': b, 'C项': c, '特殊情况': sp, '班主任坐班': duty };
+    });
+    // Sheet3: 日期汇总
+    const dayRows = dates.map(d => {
+      let checked=0, a=0, b=0, c=0, sp=0, duty=0;
+      visCls.forEach(cls => state.periods.forEach(p => {
+        const rec = allData[d] && allData[d][cls.id + '_' + p.period];
+        if (rec) { checked++; if (rec.special) sp++; SCORE_ITEMS.forEach(it=>{const g=(rec.scores[it]||'A'); if(g==='A')a++; else if(g==='B')b++; else c++;}); if (rec.scores && rec.scores['_banzhuren']) duty++; }
+      }));
+      return { '日期': d, '已巡课': checked, 'A项': a, 'B项': b, 'C项': c, '特殊情况': sp, '班主任坐班': duty };
+    });
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.json_to_sheet(detailRows);
+    ws1['!cols'] = [{wch:12},{wch:6},{wch:10},{wch:12},{wch:8},{wch:8},{wch:8},{wch:40},{wch:10},{wch:10},{wch:20},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, ws1, '巡课明细');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(sumRows), '班级汇总');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dayRows), '日期汇总');
+    XLSX.writeFile(wb, '巡课统计_' + rangeLabel + '.xlsx');
+    hideLoading();
+    showToast('已导出Excel（' + rangeLabel + '）', 'success');
+  } catch (err) {
+    hideLoading();
+    showToast('导出失败：' + err.message, 'error');
+  }
+}
+
+function exportSummary() {
+  const date = state.summaryDate;
+  let csv = '\uFEFF巡课汇总表 ' + date + '(周' + getWeekday(date) + ')\n\n';
+  // Header
+  csv += '班级';
+  state.periods.forEach(p => { csv += ',' + p.label; });
+  csv += '\n';
+  // Rows
+  visibleClasses().forEach(cls => {
+    csv += cls.name;
+    state.periods.forEach(p => {
+      const key = cls.id + '_' + p.period;
+      const rec = state.records[key];
+      if (!rec) { csv += ',未巡'; }
+      else if (rec.special) { csv += ',' + rec.special; }
+      else {
+        const grades = SCORE_ITEMS.map(item => {
+          const g = rec.scores[item] || 'A';
+          let s = item + ':' + g;
+          if (g !== 'A' && rec.reasons[item]) s += '(' + rec.reasons[item] + ')';
+          return s;
+        });
+        csv += ',' + grades.join('; ');
+      }
+    });
+    csv += '\n';
+  });
+  // Stats
+  csv += '\n统计\n';
+  let totalA = 0, totalB = 0, totalC = 0, totalSpecial = 0;
+  visibleClasses().forEach(cls => {
+    state.periods.forEach(p => {
+      const rec = state.records[cls.id + '_' + p.period];
+      if (!rec) return;
+      if (rec.special) { totalSpecial++; return; }
+      SCORE_ITEMS.forEach(item => {
+        const g = rec.scores[item] || 'A';
+        if (g === 'A') totalA++;
+        else if (g === 'B') totalB++;
+        else if (g === 'C') totalC++;
+      });
+    });
+  });
+  csv += 'A等级,' + totalA + '\nB等级,' + totalB + '\nC等级,' + totalC + '\n特殊情况,' + totalSpecial + '\n';
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '巡课汇总_' + date + '.csv';
+  a.click();
+}
+
+// ============================================
+// 设置 Tab
+// ============================================
+function switchSettingsTab(tab) {
+  state.currentSettingsTab = tab;
+  document.querySelectorAll('.settings-subtab').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.includes(tab === 'classes' ? '班级' : tab === 'teachers' ? '教师' : tab === 'schedule' ? '课表' : '节次'));
+  });
+  ['Classes','Teachers','Schedule','Periods'].forEach(t => {
+    document.getElementById('settings' + t).classList.toggle('screen-hidden', t.toLowerCase() !== tab);
+  });
+  if (tab === 'classes') renderClassSettings();
+  if (tab === 'teachers') renderTeacherSettings();
+  if (tab === 'schedule') renderScheduleSettings();
+  if (tab === 'periods') renderPeriodSettings();
+}
+
+// --- 班级管理 ---
+function renderClassSettings() {
+  const c = document.getElementById('settingsClasses');
+  let html = '<div class="settings-card"><div class="card-title">添加班级</div>';
+  html += '<div class="add-row">';
+  html += '<input type="text" id="newClassName" placeholder="班级名称(如708)" style="width:120px">';
+  html += '<button class="btn btn-primary btn-sm" onclick="addClass()">+ 添加</button>';
+  html += '</div></div>';
+  html += '<div class="settings-card"><div class="card-title">批量操作</div>';
+  html += '<div class="add-row">';
+  html += '<button class="btn btn-outline btn-sm" onclick="exportClassesTemplate()">📥 导出Excel模板</button>';
+  html += '<label class="btn btn-outline btn-sm" style="cursor:pointer">📤 导入Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importClasses(this)"></label>';
+  html += '</div></div>';
+  html += '<div class="settings-card"><div class="card-title">班级列表</div>';
+  html += '<table class="settings-table"><thead><tr><th>班级</th><th>排序</th><th>操作</th></tr></thead><tbody>';
+  state.classes.forEach((cls, i) => {
+    html += '<tr><td><input type="text" value="' + escapeAttr(cls.name) + '" onchange="updateClass(\'' + cls.id + '\',\'name\',this.value)"></td>';
+    html += '<td><input type="number" value="' + cls.sort_order + '" onchange="updateClass(\'' + cls.id + '\',\'sort_order\',this.value)" style="width:50px"></td>';
+    html += '<td><span class="remove-x" onclick="deleteClass(\'' + cls.id + '\')">×</span></td></tr>';
+  });
+  html += '</tbody></table></div>';
+  c.innerHTML = html;
+}
+async function addClass() {
+  const name = document.getElementById('newClassName').value.trim();
+  if (!name) { showToast('请输入班级名称', 'error'); return; }
+  const id = 'pc' + Date.now();
+  const maxSort = state.classes.length > 0 ? Math.max(...state.classes.map(c => c.sort_order || 0)) : -1;
+  try {
+    const { error } = await sb.from(TB('patrol_classes')).insert({ id, name, sort_order: maxSort + 1 });
+    if (error) throw error;
+    await loadClasses();
+    renderClassSettings();
+    showToast('班级已添加', 'success');
+  } catch (err) { showToast('添加失败：' + err.message, 'error'); }
+}
+async function updateClass(id, field, value) {
+  const cls = state.classes.find(c => c.id === id);
+  if (!cls) return;
+  if (field === 'sort_order') value = parseInt(value) || 0;
+  cls[field] = value;
+  try {
+    const { error } = await sb.from(TB('patrol_classes')).update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+    await loadClasses();
+    showToast('已更新', 'success');
+  } catch (err) { showToast('更新失败：' + err.message, 'error'); }
+}
+async function deleteClass(id) {
+  if (!confirm('确定删除该班级吗？相关巡课数据也将删除。')) return;
+  try {
+    await sb.from(TB('patrol_classes')).delete().eq('id', id);
+    await sb.from(TB('patrol_schedule')).delete().eq('class_id', id);
+    await sb.from(TB('patrol_records')).delete().eq('class_id', id);
+    // Remove associated photos from storage
+    const { data: phRows } = await sb.from(TB('patrol_photos')).select('photo_path').eq('class_id', id);
+    if (phRows && phRows.length > 0) {
+      const paths = phRows.map(r => r.photo_path).filter(Boolean);
+      if (paths.length > 0) await sb.storage.from('patrol-photos').remove(paths);
+    }
+    await sb.from(TB('patrol_photos')).delete().eq('class_id', id);
+    await loadClasses();
+    await loadSchedule();
+    renderClassSettings();
+    showToast('班级已删除', 'success');
+  } catch (err) { showToast('删除失败：' + err.message, 'error'); }
+}
+
+// --- 教师管理 ---
+function renderTeacherSettings() {
+  const c = document.getElementById('settingsTeachers');
+  let html = '<div class="settings-card"><div class="card-title">添加教师</div>';
+  html += '<div class="add-row">';
+  html += '<input type="text" id="newTeacherName" placeholder="教师姓名" style="width:100px">';
+  html += '<select id="newTeacherGroup" style="width:100px">';
+  PATROL_GROUPS.forEach(g => { html += '<option value="' + g + '">' + g + '</option>'; });
+  html += '</select>';
+  html += '<button class="btn btn-primary btn-sm" onclick="addTeacher()">+ 添加</button>';
+  html += '<button class="btn btn-outline btn-sm" onclick="exportTeachersTemplate()">📥 导出Excel模板</button>';
+  html += '<label class="btn btn-outline btn-sm" style="cursor:pointer">📤 导入Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importTeachers(this)"></label>';
+  html += '</div></div>';
+  html += '<div class="settings-card"><div class="card-title">教师列表</div>';
+  if (state.teachers.length === 0) {
+    html += '<div class="empty-state"><div class="text">暂无教师</div><div class="hint">添加后巡课老师可登录</div></div>';
+  } else {
+    html += '<table class="settings-table"><thead><tr><th>姓名</th><th>备课组</th><th>操作</th></tr></thead><tbody>';
+    state.teachers.forEach(t => {
+      html += '<tr><td><input type="text" value="' + escapeAttr(t.name) + '" onchange="updateTeacher(\'' + t.id + '\',\'name\',this.value)"></td>';
+      html += '<td><select onchange="updateTeacher(\'' + t.id + '\',\'group_name\',this.value)">';
+      PATROL_GROUPS.forEach(g => { html += '<option value="' + g + '"' + (t.group_name === g ? ' selected' : '') + '>' + g + '</option>'; });
+      html += '</select></td>';
+      html += '<td><span class="remove-x" onclick="deleteTeacher(\'' + t.id + '\')">×</span></td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  html += '</div>';
+  c.innerHTML = html;
+}
+async function addTeacher() {
+  const name = document.getElementById('newTeacherName').value.trim();
+  const group = document.getElementById('newTeacherGroup').value;
+  if (!name) { showToast('请输入教师姓名', 'error'); return; }
+  const id = 'pt' + Date.now();
+  const maxSort = state.teachers.length > 0 ? Math.max(...state.teachers.map(t => t.sort_order || 0)) : -1;
+  try {
+    const { error } = await sb.from(TB('patrol_teachers')).insert({ id, name, group_name: group, sort_order: maxSort + 1 });
+    if (error) throw error;
+    await loadTeachers();
+    renderTeacherSettings();
+    showToast('教师已添加', 'success');
+  } catch (err) { showToast('添加失败：' + err.message, 'error'); }
+}
+async function updateTeacher(id, field, value) {
+  const t = state.teachers.find(x => x.id === id);
+  if (!t) return;
+  t[field] = value;
+  try {
+    const { error } = await sb.from(TB('patrol_teachers')).update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+    await loadTeachers();
+  } catch (err) { showToast('更新失败：' + err.message, 'error'); }
+}
+async function deleteTeacher(id) {
+  if (!confirm('确定删除该教师吗？')) return;
+  try {
+    await sb.from(TB('patrol_teachers')).delete().eq('id', id);
+    await loadTeachers();
+    renderTeacherSettings();
+    showToast('教师已删除', 'success');
+  } catch (err) { showToast('删除失败：' + err.message, 'error'); }
+}
+
+// --- 课表配置 ---
+function renderScheduleSettings() {
+  const c = document.getElementById('settingsSchedule');
+  let html = '<div class="settings-card"><div class="card-title">课表配置</div>';
+  html += '<div style="font-size:13px;color:var(--text2);margin-bottom:8px">为每个班级的每个节次设置课程和上课教师</div>';
+  html += '<div class="add-row" style="margin-bottom:8px">';
+  html += '<button class="btn btn-outline btn-sm" onclick="exportScheduleTemplate()">📥 导出Excel模板</button>';
+  html += '<label class="btn btn-outline btn-sm" style="cursor:pointer">📤 导入Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importSchedule(this)"></label>';
+  html += '</div>';
+  if (state.classes.length === 0) {
+    html += '<div class="empty-state"><div class="text">请先添加班级</div></div>';
+  } else {
+    html += '<div style="overflow-x:auto"><table class="settings-table"><thead><tr><th>班级</th>';
+    state.periods.forEach(p => { html += '<th>' + p.label + '</th>'; });
+    html += '<th>巡课人</th>';
+    html += '</tr></thead><tbody>';
+    state.classes.forEach(cls => {
+      html += '<tr><td class="class-col">' + cls.name + '</td>';
+      state.periods.forEach(p => {
+        const sched = getSchedule(cls.id, p.period);
+        const subject = sched ? sched.subject || '' : '';
+        const teacher = sched ? sched.teacher_name || '' : '';
+        html += '<td><input type="text" placeholder="课程" value="' + escapeAttr(subject) + '" style="margin-bottom:2px" onchange="updateSchedule(\'' + cls.id + '\',' + p.period + ',\'subject\',this.value)">';
+        html += '<input type="text" placeholder="教师" value="' + escapeAttr(teacher) + '" onchange="updateSchedule(\'' + cls.id + '\',' + p.period + ',\'teacher_name\',this.value)"></td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+  c.innerHTML = html;
+}
+async function updateSchedule(classId, period, field, value) {
+  const key = classId + '_' + period;
+  const existing = state.schedule[key];
+  try {
+    if (existing) {
+      const { error } = await sb.from(TB('patrol_schedule')).update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const id = 'ps' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+      const insertData = { id, class_id: classId, period };
+      insertData[field] = value;
+      const { error } = await sb.from(TB('patrol_schedule')).insert(insertData);
+      if (error) throw error;
+    }
+    await loadSchedule();
+    showToast('课表已更新', 'success');
+  } catch (err) { showToast('更新失败：' + err.message, 'error'); }
+}
+
+// --- 节次时间 ---
+function renderPeriodSettings() {
+  const c = document.getElementById('settingsPeriods');
+  let html = '<div class="settings-card"><div class="card-title">节次时间配置</div>';
+  html += '<div style="font-size:13px;color:var(--text2);margin-bottom:8px">系统将根据此时间自动判断当前节次</div>';
+  html += '<div class="add-row" style="margin-bottom:8px">';
+  html += '<button class="btn btn-outline btn-sm" onclick="exportPeriodsTemplate()">📥 导出Excel模板</button>';
+  html += '<label class="btn btn-outline btn-sm" style="cursor:pointer">📤 导入Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importPeriods(this)"></label>';
+  html += '</div>';
+  html += '<table class="settings-table"><thead><tr><th>节次</th><th>开始时间</th><th>结束时间</th><th>显示名称</th></tr></thead><tbody>';
+  state.periods.forEach(p => {
+    html += '<tr><td>' + p.label + '</td>';
+    html += '<td><input type="time" value="' + p.start_time + '" onchange="updatePeriod(' + p.period + ',\'start_time\',this.value)"></td>';
+    html += '<td><input type="time" value="' + p.end_time + '" onchange="updatePeriod(' + p.period + ',\'end_time\',this.value)"></td>';
+    html += '<td><input type="text" value="' + escapeAttr(p.label) + '" onchange="updatePeriod(' + p.period + ',\'label\',this.value)"></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  c.innerHTML = html;
+}
+async function updatePeriod(period, field, value) {
+  try {
+    const { error } = await sb.from(TB('patrol_periods')).update({ [field]: value, updated_at: new Date().toISOString() }).eq('period', period);
+    if (error) throw error;
+    await loadPeriods();
+    populatePeriodSelect();
+    showToast('节次时间已更新', 'success');
+  } catch (err) { showToast('更新失败：' + err.message, 'error'); }
+}
+
+
+// ============================================
+// 统计 Tab
+// ============================================
+let statsChart1 = null, statsChart2 = null;
+
+async function renderStats() {
+  await loadLib('chart').catch(e => showToast(e.message, 'error'));
+  const range = document.getElementById('statsRange').value;
+  const dates = getStatsDates(range);
+  if (dates.length === 0) { showToast('没有数据', 'error'); return; }
+  
+  // Load all dates
+  const allData = {};
+  for (const d of dates) {
+    const { data } = await sb.from(TB('patrol_records')).select('*').eq('date', d);
+    const records = {};
+    if (data) data.forEach(r => { records[r.class_id + '_' + r.period] = { scores: r.scores || {}, reasons: r.reasons || {}, remark: r.remark || '', special: r.special || '', inspector: r.inspector || '' }; });
+    allData[d] = records;
+  }
+  
+  // Summary stats
+  let totalA = 0, totalB = 0, totalC = 0, totalSpecial = 0, totalChecked = 0;
+  const classStats = {};
+  state.classes.forEach(c => { classStats[c.id] = { name: c.name, a: 0, b: 0, c: 0, special: 0, checked: 0 }; });
+  const dailyStats = {};
+  
+  dates.forEach(d => {
+    let dayA = 0, dayB = 0, dayC = 0, dayTotal = 0;
+    state.classes.forEach(cls => {
+      state.periods.forEach(p => {
+        const rec = allData[d][cls.id + '_' + p.period];
+        if (!rec) return;
+        totalChecked++; classStats[cls.id].checked++; dayTotal++;
+        if (rec.special) { totalSpecial++; classStats[cls.id].special++; return; }
+        SCORE_ITEMS.forEach(item => {
+          const g = rec.scores[item] || 'A';
+          if (g === 'A') { totalA++; classStats[cls.id].a++; dayA++; }
+          else if (g === 'B') { totalB++; classStats[cls.id].b++; dayB++; }
+          else if (g === 'C') { totalC++; classStats[cls.id].c++; dayC++; }
+        });
+      });
+    });
+    dailyStats[d] = { a: dayA, b: dayB, c: dayC, total: dayTotal };
+  });
+  
+  document.getElementById('statsSummary').innerHTML = 
+    '<div class="stat-card"><div class="num" style="color:var(--primary)">' + dates.length + '</div><div class="lbl">统计天数</div></div>' +
+    '<div class="stat-card"><div class="num" style="color:var(--green)">' + totalA + '</div><div class="lbl">A项</div></div>' +
+    '<div class="stat-card"><div class="num" style="color:var(--orange)">' + totalB + '</div><div class="lbl">B项</div></div>' +
+    '<div class="stat-card"><div class="num" style="color:var(--red)">' + totalC + '</div><div class="lbl">C项</div></div>' +
+    '<div class="stat-card"><div class="num" style="color:var(--purple)">' + totalSpecial + '</div><div class="lbl">特殊情况</div></div>';
+  
+  // Chart 1: Class A-rate bar chart
+  if (statsChart1) statsChart1.destroy();
+  const classLabels = state.classes.map(c => c.name);
+  const classARates = state.classes.map(c => {
+    const s = classStats[c.id];
+    const total = s.a + s.b + s.c;
+    return total > 0 ? Math.round(s.a / total * 100) : 0;
+  });
+  const ctx1 = document.getElementById('chartClassTrend');
+  statsChart1 = new Chart(ctx1, {
+    type: 'bar',
+    data: { labels: classLabels, datasets: [{ label: 'A率(%)', data: classARates, backgroundColor: classARates.map(r => r >= 90 ? '#52c41a' : (r >= 70 ? '#fa8c16' : '#ff4d4f')) }] },
+    options: { responsive: true, scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'A率(%)' } } }, plugins: { legend: { display: false } } }
+  });
+  
+  // Chart 2: Daily trend line chart
+  if (statsChart2) statsChart2.destroy();
+  const dailyLabels = dates.map(d => parseInt(d.split('-')[2]) + '日');
+  const dailyARates = dates.map(d => {
+    const s = dailyStats[d];
+    return s.total > 0 ? Math.round(s.a / s.total * 100) : 0;
+  });
+  const ctx2 = document.getElementById('chartDailyTrend');
+  statsChart2 = new Chart(ctx2, {
+    type: 'line',
+    data: { labels: dailyLabels, datasets: [{ label: 'A率(%)', data: dailyARates, borderColor: '#1677ff', backgroundColor: 'rgba(22,119,255,0.1)', fill: true, tension: 0.3 }] },
+    options: { responsive: true, scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'A率(%)' } } }, plugins: { legend: { display: false } } }
+  });
+  
+  // Alerts: classes with B/C
+
+// Enhanced alerts: check consecutive B/C across days
+  const alertDetails = state.classes.map(c => {
+    const s = classStats[c.id];
+    const total = s.a + s.b + s.c;
+    const aRate = total > 0 ? Math.round(s.a / total * 100) : 100;
+    const issueCount = s.b + s.c;
+    const level = aRate < 70 ? 'high' : (aRate < 90 ? 'medium' : (issueCount > 0 ? 'low' : ''));
+    if (!level) return null;
+    const color = level === 'high' ? 'var(--red)' : (level === 'medium' ? 'var(--orange)' : 'var(--text2)');
+    const tag = level === 'high' ? '🔴 高度关注' : (level === 'medium' ? '🟡 需关注' : '🔵 一般');
+    return '<div style="padding:10px 12px;background:#fff;border-radius:6px;margin-bottom:6px;border-left:4px solid ' + color + '">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between">' +
+      '<span style="font-weight:600;font-size:15px">' + c.name + '</span>' +
+      '<span style="font-size:12px;color:' + color + '">' + tag + '</span>' +
+      '</div>' +
+      '<div style="margin-top:4px;font-size:13px;color:var(--text2)">' +
+      'A率 ' + aRate + '% · ' +
+      '<span style="color:var(--green)">A ' + s.a + '</span> · ' +
+      '<span style="color:var(--orange)">B ' + s.b + '</span> · ' +
+      '<span style="color:var(--red)">C ' + s.c + '</span> · ' +
+      '<span style="color:var(--purple)">特殊 ' + s.special + '</span>' +
+      '</div></div>';
+  }).filter(x => x !== null).join('');
+  document.getElementById('statsAlerts').innerHTML = alertDetails || '<div style="text-align:center;color:var(--text2);padding:12px">所有班级表现良好</div>';
+}
+
+function getStatsDates(range) {
+  const dates = [];
+  const today = new Date();
+  if (range === 'today') {
+    dates.push(today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0'));
+  } else if (range === 'week') {
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    for (let d = new Date(monday); d <= today; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0) dates.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'));
+    }
+  } else if (range === 'month') {
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    for (let d = new Date(first); d <= today; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0) dates.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'));
+    }
+  }
+  return dates;
+}
+
+
+
+// ============================================
+// Excel 导出/导入
+// ============================================
+
+// 统一刷新所有界面
+function refreshAllUI() {
+  // 刷新登录页教师列表
+  populateGroupSelect();
+  // 刷新当前设置页
+  const tab = state.currentSettingsTab;
+  if (tab === 'classes') renderClassSettings();
+  if (tab === 'teachers') renderTeacherSettings();
+  if (tab === 'schedule') renderScheduleSettings();
+  if (tab === 'periods') renderPeriodSettings();
+  // 刷新巡课页
+  renderPatrol();
+  // 刷新汇总页（如在汇总tab）
+  const summaryTab = document.getElementById('tab-summary');
+  if (summaryTab && summaryTab.classList.contains('active')) renderSummary();
+  // 刷新统计页（如在统计tab）
+  const statsTab = document.getElementById('tab-stats');
+  if (statsTab && statsTab.classList.contains('active')) renderStats();
+  // 刷新反馈页（如在反馈tab）
+  const feedbackTab = document.getElementById('tab-feedback');
+  if (feedbackTab && feedbackTab.classList.contains('active')) renderFeedback();
+}
+
+// --- 班级管理 ---
+async function exportClassesTemplate() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const data = state.classes.map(c => ({ 班级名称: c.name, 排序: c.sort_order || 0 }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '班级列表');
+  XLSX.writeFile(wb, '班级列表模板.xlsx');
+  showToast('已导出班级列表模板', 'success');
+}
+
+async function importClasses(input) {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws);
+    if (rows.length === 0) { showToast('Excel中没有数据', 'error'); return; }
+    if (!confirm('导入将覆盖现有班级数据，确定继续吗？')) { input.value = ''; return; }
+    showLoading('导入班级数据...');
+    // Delete existing classes
+    await sb.from(TB('patrol_classes')).delete().neq('id', 'dummy');
+    let added = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const name = String(rows[i]['班级名称'] || '').trim();
+      if (!name) continue;
+      const sortOrder = parseInt(rows[i]['排序']) || i;
+      const id = 'pc' + Date.now() + '_' + i;
+      const { error } = await sb.from(TB('patrol_classes')).insert({ id, name, sort_order: sortOrder });
+      if (error) throw error;
+      added++;
+    }
+    await loadClasses();
+    await loadSchedule(); // 班级变化后课表也需刷新
+    refreshAllUI();
+    hideLoading();
+    showToast('已导入 ' + added + ' 个班级', 'success');
+  } catch (err) {
+    hideLoading();
+    showToast('导入失败：' + err.message, 'error');
+  }
+  input.value = '';
+}
+
+// --- 教师管理 ---
+async function exportTeachersTemplate() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const data = state.teachers.map(t => ({ 姓名: t.name, 备课组: t.group_name, 排序: t.sort_order || 0 }));
+  if (data.length === 0) {
+    // Export template with group options
+    const template = [{ 姓名: '示例教师', 备课组: '语文', 排序: 0 }];
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '教师列表');
+    XLSX.writeFile(wb, '教师列表模板.xlsx');
+  } else {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '教师列表');
+    XLSX.writeFile(wb, '教师列表模板.xlsx');
+  }
+  showToast('已导出教师列表模板', 'success');
+}
+
+async function importTeachers(input) {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws);
+    if (rows.length === 0) { showToast('Excel中没有数据', 'error'); return; }
+    if (!confirm('导入将覆盖现有教师数据，确定继续吗？')) { input.value = ''; return; }
+    showLoading('导入教师数据...');
+    await sb.from(TB('patrol_teachers')).delete().neq('id', 'dummy');
+    let added = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const name = String(rows[i]['姓名'] || '').trim();
+      if (!name) continue;
+      const group = String(rows[i]['备课组'] || '').trim();
+      if (!PATROL_GROUPS.includes(group)) { showToast('第' + (i+2) + '行备课组无效：' + group, 'error'); continue; }
+      const sortOrder = parseInt(rows[i]['排序']) || i;
+      const id = 'pt' + Date.now() + '_' + i;
+      const { error } = await sb.from(TB('patrol_teachers')).insert({ id, name, group_name: group, sort_order: sortOrder });
+      if (error) throw error;
+      added++;
+    }
+    await loadTeachers();
+    refreshAllUI();
+    hideLoading();
+    showToast('已导入 ' + added + ' 名教师', 'success');
+  } catch (err) {
+    hideLoading();
+    showToast('导入失败：' + err.message, 'error');
+  }
+  input.value = '';
+}
+
+// --- 课表配置 ---
+async function exportScheduleTemplate() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  if (state.classes.length === 0) { showToast('请先添加班级', 'error'); return; }
+  // Build schedule data: each row = one class, columns = periods (subject|teacher)
+  const headers = ['班级'];
+  state.periods.forEach(p => { headers.push(p.label + '_课程'); headers.push(p.label + '_教师'); });
+  const data = [];
+  state.classes.forEach(cls => {
+    const row = { '班级': cls.name };
+    state.periods.forEach(p => {
+      const sched = getSchedule(cls.id, p.period);
+      row[p.label + '_课程'] = sched ? sched.subject || '' : '';
+      row[p.label + '_教师'] = sched ? sched.teacher_name || '' : '';
+    });
+    data.push(row);
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '课表配置');
+  XLSX.writeFile(wb, '课表配置模板.xlsx');
+  showToast('已导出课表配置模板', 'success');
+}
+
+async function importSchedule(input) {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws);
+    if (rows.length === 0) { showToast('Excel中没有数据', 'error'); return; }
+    showLoading('导入课表数据...');
+    let updated = 0;
+    for (const row of rows) {
+      const className = String(row['班级'] || '').trim();
+      const cls = state.classes.find(c => c.name === className);
+      if (!cls) continue;
+      for (const p of state.periods) {
+        const subjectKey = p.label + '_课程';
+        const teacherKey = p.label + '_教师';
+        const subject = row[subjectKey] !== undefined ? String(row[subjectKey] || '').trim() : '';
+        const teacher = row[teacherKey] !== undefined ? String(row[teacherKey] || '').trim() : '';
+        const existing = state.schedule[cls.id + '_' + p.period];
+        if (existing) {
+          const { error } = await sb.from(TB('patrol_schedule')).update({
+            subject: subject || null,
+            teacher_name: teacher || null,
+            updated_at: new Date().toISOString()
+          }).eq('id', existing.id);
+          if (error) throw error;
+        } else if (subject || teacher) {
+          const id = 'ps' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+          const { error } = await sb.from(TB('patrol_schedule')).insert({
+            id, class_id: cls.id, period: p.period,
+            subject: subject || null, teacher_name: teacher || null
+          });
+          if (error) throw error;
+        }
+        updated++;
+      }
+    }
+    await loadSchedule();
+    refreshAllUI();
+    hideLoading();
+    showToast('已导入课表数据（' + updated + '项）', 'success');
+  } catch (err) {
+    hideLoading();
+    showToast('导入失败：' + err.message, 'error');
+  }
+  input.value = '';
+}
+
+// --- 节次时间 ---
+async function exportPeriodsTemplate() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const data = state.periods.map(p => ({
+    节次编号: p.period,
+    开始时间: p.start_time,
+    结束时间: p.end_time,
+    显示名称: p.label
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '节次时间');
+  XLSX.writeFile(wb, '节次时间模板.xlsx');
+  showToast('已导出节次时间模板', 'success');
+}
+
+async function importPeriods(input) {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws);
+    if (rows.length === 0) { showToast('Excel中没有数据', 'error'); return; }
+    showLoading('导入节次时间...');
+    let updated = 0;
+    for (const row of rows) {
+      const period = parseInt(row['节次编号']);
+      if (isNaN(period)) continue;
+      const startTime = String(row['开始时间'] || '').trim();
+      const endTime = String(row['结束时间'] || '').trim();
+      const label = String(row['显示名称'] || '').trim();
+      const updateData = { updated_at: new Date().toISOString() };
+      if (startTime) updateData.start_time = startTime;
+      if (endTime) updateData.end_time = endTime;
+      if (label) updateData.label = label;
+      const { error } = await sb.from(TB('patrol_periods')).update(updateData).eq('period', period);
+      if (error) throw error;
+      updated++;
+    }
+    await loadPeriods();
+    await loadSchedule(); // 节次变化后课表也需刷新
+    refreshAllUI();
+    hideLoading();
+    showToast('已更新 ' + updated + ' 个节次', 'success');
+  } catch (err) {
+    hideLoading();
+    showToast('导入失败：' + err.message, 'error');
+  }
+  input.value = '';
+}
+
+// ============================================
+// Tab 切换
+// ============================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  // Clear auto-refresh
+  if (state.autoRefreshTimer) { clearInterval(state.autoRefreshTimer); state.autoRefreshTimer = null; }
+  if (tab === 'patrol') {
+    loadPatrolRecords(state.viewDate).then(() => {
+      loadPatrolPhotos(state.viewDate, state.currentPeriod).then(() => renderPatrol());
+    });
+  } else if (tab === 'summary') {
+    renderSummary();
+    state.autoRefreshTimer = setInterval(() => renderSummary(), 30000);
+  } else if (tab === 'feedback') {
+    renderFeedback();
+  } else if (tab === 'stats') {
+    renderStats();
+  } else if (tab === 'settings') {
+    renderClassSettings();
+  } else if (tab === 'issues') {
+    loadIssues().then(renderIssues);
+  }
+}
+
+// ============================================
+// 问题跟踪闭环
+// ============================================
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+async function loadIssues() {
+  const { data, error } = await sb.from(TB('patrol_issues')).select('*').order('created_at', { ascending: false });
+  if (error) throw error;
+  state.issues = data || [];
+}
+function initIssueForm() {
+  const dateEl = document.getElementById('issueDate');
+  if (dateEl && !dateEl.value) dateEl.value = state.viewDate;
+  const clsEl = document.getElementById('issueClass');
+  if (clsEl && clsEl.options.length <= 1) {
+    clsEl.innerHTML = '<option value="">不指定班级</option>' + state.classes.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+  }
+}
+function renderIssues() {
+  initIssueForm();
+  const filter = document.getElementById('issueFilter').value;
+  const clsName = id => { const c = state.classes.find(x => x.id === id); return c ? c.name : (id || '全校'); };
+  // 统计卡片
+  const stats = { '待处理':0, '处理中':0, '已解决':0, '已关闭':0 };
+  state.issues.forEach(i => { if (stats[i.status] !== undefined) stats[i.status]++; });
+  document.getElementById('issueStats').innerHTML = Object.keys(stats).map(s =>
+    '<div style="background:#fff;border-radius:var(--radius);padding:8px 16px;min-width:84px;text-align:center">' +
+    '<div style="font-size:20px;font-weight:700">' + stats[s] + '</div>' +
+    '<div style="font-size:12px;color:var(--text2)">' + s + '</div></div>').join('');
+  // 列表
+  let list = state.issues;
+  if (filter && filter !== '全部') list = list.filter(i => i.status === filter);
+  const listEl = document.getElementById('issueList');
+  if (list.length === 0) {
+    listEl.innerHTML = '<div style="background:#fff;border-radius:var(--radius);padding:20px;text-align:center;color:var(--text2)">暂无问题记录</div>';
+    return;
+  }
+  const statusOptions = ['待处理','处理中','已解决','已关闭'].map(s => '<option>' + s + '</option>').join('');
+  listEl.innerHTML = list.map(iss => {
+    const id = iss.id;
+    let sel = statusOptions;
+    if (iss.status) sel = sel.replace('<option>' + iss.status + '</option>', '<option selected>' + iss.status + '</option>');
+    return '<div style="background:#fff;border-radius:var(--radius);padding:12px 16px;margin-bottom:10px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<span style="font-weight:600">【' + escHtml(iss.category) + '】' + clsName(iss.class_id) + ' · ' + escHtml(iss.date) + '</span>' +
+        '<span style="font-size:11px;color:var(--text2)">' + escHtml(iss.reporter) + '</span>' +
+      '</div>' +
+      '<div style="font-size:14px;margin-bottom:8px">' + escHtml(iss.content) + '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px">' +
+        '状态:<select onchange="updateIssueStatus(\'' + id + '\',this.value)" style="padding:3px 4px;border:1px solid var(--border);border-radius:4px;font-size:12px">' + sel + '</select>' +
+        '<span style="color:var(--text2)">处理人</span><input style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;width:80px" value="' + escAttr(iss.handler || '') + '" onchange="updateIssueField(\'' + id + '\',\'handler\',this.value)">' +
+        '<span style="color:var(--text2)">处理方案</span><input style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;flex:1;min-width:140px" value="' + escAttr(iss.solution || '') + '" onchange="updateIssueField(\'' + id + '\',\'solution\',this.value)">' +
+        (iss.resolved_at ? '<span style="font-size:11px;color:var(--text2)">解决:' + String(iss.resolved_at).substring(0,10) + '</span>' : '') +
+        '<button class="btn btn-outline btn-sm" onclick="deleteIssue(\'' + id + '\')">删除</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+async function addIssue() {
+  const date = document.getElementById('issueDate').value || state.viewDate;
+  const class_id = document.getElementById('issueClass').value;
+  const category = document.getElementById('issueCategory').value;
+  const content = document.getElementById('issueContent').value.trim();
+  const reporter = document.getElementById('issueReporter').value.trim() || state.teacher || '教务处';
+  if (!content) { showToast('请填写问题描述', 'error'); return; }
+  const id = 'iss_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+  try {
+    const { error } = await sb.from(TB('patrol_issues')).insert({ id, date, class_id, category, content, reporter, status: '待处理' });
+    if (error) throw error;
+  } catch (err) { showToast('提交失败：' + err.message, 'error'); return; }
+  state.issues.unshift({ id, date, class_id, category, content, reporter, status: '待处理', handler: null, solution: null, resolved_at: null });
+  document.getElementById('issueContent').value = '';
+  document.getElementById('issueReporter').value = '';
+  renderIssues();
+  showToast('问题已提交', 'success');
+}
+async function updateIssueStatus(id, status) {
+  const resolved = (status === '已解决' || status === '已关闭') ? new Date().toISOString() : null;
+  try {
+    const { error } = await sb.from(TB('patrol_issues')).update({ status: status, resolved_at: resolved }).eq('id', id);
+    if (error) throw error;
+  } catch (err) { showToast('更新失败：' + err.message, 'error'); return; }
+  const it = state.issues.find(x => x.id === id);
+  if (it) { it.status = status; it.resolved_at = resolved; }
+  renderIssues();
+  showToast('状态已更新', 'success');
+}
+async function updateIssueField(id, field, value) {
+  try {
+    const { error } = await sb.from(TB('patrol_issues')).update({ [field]: value }).eq('id', id);
+    if (error) throw error;
+  } catch (err) { showToast('更新失败：' + err.message, 'error'); return; }
+  const it = state.issues.find(x => x.id === id);
+  if (it) it[field] = value;
+}
+async function deleteIssue(id) {
+  if (!confirm('确定删除该问题记录吗？')) return;
+  try {
+    const { error } = await sb.from(TB('patrol_issues')).delete().eq('id', id);
+    if (error) throw error;
+  } catch (err) { showToast('删除失败：' + err.message, 'error'); return; }
+  state.issues = state.issues.filter(x => x.id !== id);
+  renderIssues();
+  showToast('已删除', 'success');
+}
+async function exportIssues() {
+  await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
+  const clsName = id => { const c = state.classes.find(x => x.id === id); return c ? c.name : (id || '全校'); };
+  const data = state.issues.map(iss => ({
+    '日期': iss.date,
+    '班级': clsName(iss.class_id),
+    '类别': iss.category,
+    '问题描述': iss.content,
+    '提交人': iss.reporter,
+    '状态': iss.status,
+    '处理人': iss.handler || '',
+    '处理方案': iss.solution || '',
+    '解决时间': iss.resolved_at ? String(iss.resolved_at).substring(0,16).replace('T',' ') : ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '问题跟踪');
+  XLSX.writeFile(wb, '问题跟踪记录.xlsx');
+}
+
+// ============================================
+// 初始化
+// ============================================
+function toggleStandards() {
+  document.getElementById("standardsPanel").classList.toggle("screen-hidden");
+}
+
+function onPatrolDateChange() {
+  state.viewDate = document.getElementById("patrolDate").value;
+  document.getElementById("headerDate").textContent = formatDateCN(state.viewDate) + " 周" + getWeekday(state.viewDate);
+  state.attendanceCache = {};
+  loadPatrolRecords(state.viewDate).then(() => {
+    loadPatrolPhotos(state.viewDate, state.currentPeriod).then(() => renderPatrol());
+  });
+}
+function goToToday() {
+  state.viewDate = todayStr();
+  document.getElementById("patrolDate").value = state.viewDate;
+  onPatrolDateChange();
+}
+
+function logout() {
+  state.role = null;
+  state.teacher = null;
+  state.group = null;
+  if (state.autoRefreshTimer) { clearInterval(state.autoRefreshTimer); state.autoRefreshTimer = null; }
+  showLoginScreen();
+}
+
+async function init() {
+  initSupabase();
+  await loadData();
+  if (state.classes.length === 0) {
+    showToast('请在设置中添加班级', 'info');
+  }
+  showLoginScreen();
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+<script>window.addEventListener('load',function(){var el=document.getElementById('app-loading');if(el){el.style.opacity='0';setTimeout(function(){el.remove()},300)}});</script>
+<!-- 通用确认弹层（兼容QQ内嵌浏览器） -->
+<div id="confirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:20px" onclick="cancelConfirm()">
+  <div style="background:#fff;border-radius:14px;padding:22px;width:100%;max-width:320px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.2)" onclick="event.stopPropagation()">
+    <div id="confirmTitle" style="font-size:16px;font-weight:600;margin-bottom:14px;line-height:1.5">确定执行此操作吗？</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-outline" style="flex:1" onclick="cancelConfirm()">取消</button>
+      <button class="btn btn-primary" style="flex:1" onclick="doConfirm()">确定</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
