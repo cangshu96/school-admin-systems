@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>巡课汇总反馈系统 v2.8.5</title>
+<title>七年级巡课汇总反馈系统 v3.0.0</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -445,15 +445,13 @@ body { font-size: 16px; line-height: 1.5; }
 <!-- ===== Login Screen ===== -->
 <div id="loginScreen">
   <div class="login-card">
-    <h1>📋 巡课汇总反馈系统</h1>
-    <div class="version">v2.8.5</div>
+    <h1>📋 七年级巡课汇总反馈系统</h1>
+    <div class="version">v3.0.0</div>
     <div class="subtitle">武汉市二桥中学 · 知音七年级</div>
-    <div class="form-group">
+    <div class="form-group" id="loginDeptGroup">
       <label>级部</label>
       <select id="loginDept" onchange="updateTeacherList()">
         <option value="">请选择级部</option>
-        <option value="一级部">一级部（701-707）</option>
-        <option value="二级部">二级部（708-713）</option>
       </select>
     </div>
     <div class="form-group">
@@ -490,7 +488,7 @@ body { font-size: 16px; line-height: 1.5; }
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 巡课汇总 <span class="ver">v2.8.5</span></h1>
+    <h1>📋 七年级巡课汇总 <span class="ver">v3.0.0</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -725,6 +723,16 @@ const EMBEDDED_CONFIG = {
 };
 const ADMIN_PASSWORD = 'EQjwc';
 const PATROL_GROUPS = ['语文', '数学', '英语', '道法', '历史', '综合组'];
+
+// ===== 学年配置（构建脚本按年级替换此块）=====
+const GRADE_CONFIG = {"grade": "七年级", "dir": "patrol", "subtitle": "武汉市二桥中学 · 知音七年级", "classPrefix": 7, "suffix": "", "depts": [{"name": "一级部", "min": 1, "max": 7}, {"name": "二级部", "min": 8, "max": 13}]};
+// 表名辅助：八年级表带 _g8 后缀，九年级带 _g9 后缀，七年级无后缀
+function TB(name) { return name + GRADE_CONFIG.suffix; }
+// 级部范围标签，如 一级部（701-707）
+function deptRangeLabel(d) {
+  const pre = GRADE_CONFIG.classPrefix * 100;
+  return d.name + '（' + (pre + d.min) + '-' + (pre + d.max) + '）';
+}
 const SCORE_ITEMS = ['教室环境', '课堂纪律', '学习状态'];
 const SCORE_GRADES = ['A', 'B', 'C'];
 const SPECIAL_OPTIONS = [
@@ -838,22 +846,22 @@ function initSupabase() {
 // 数据加载
 // ============================================
 async function loadClasses() {
-  const { data, error } = await sb.from('patrol_classes').select('*').order('sort_order');
+  const { data, error } = await sb.from(TB('patrol_classes')).select('*').order('sort_order');
   if (error) throw error;
   state.classes = data || [];
 }
 async function loadTeachers() {
-  const { data, error } = await sb.from('patrol_teachers').select('*').order('sort_order');
+  const { data, error } = await sb.from(TB('patrol_teachers')).select('*').order('sort_order');
   if (error) throw error;
   state.teachers = data || [];
 }
 async function loadPeriods() {
-  const { data, error } = await sb.from('patrol_periods').select('*').order('period');
+  const { data, error } = await sb.from(TB('patrol_periods')).select('*').order('period');
   if (error) throw error;
   state.periods = data || [];
 }
 async function loadSchedule() {
-  const { data, error } = await sb.from('patrol_schedule').select('*');
+  const { data, error } = await sb.from(TB('patrol_schedule')).select('*');
   if (error) throw error;
   state.schedule = {};
   if (data) {
@@ -878,7 +886,7 @@ async function loadData() {
 // 巡课记录加载与保存
 // ============================================
 async function loadPatrolRecords(dateStr) {
-  const { data, error } = await sb.from('patrol_records')
+  const { data, error } = await sb.from(TB('patrol_records'))
     .select('*').eq('date', dateStr);
   if (error) throw error;
   state.records = {};
@@ -897,7 +905,7 @@ async function loadPatrolRecords(dateStr) {
   }
 }
 async function loadPatrolPhotos(dateStr, period) {
-  const { data, error } = await sb.from('patrol_photos')
+  const { data, error } = await sb.from(TB('patrol_photos'))
     .select('*').eq('date', dateStr).eq('period', period);
   if (error) throw error;
   state.photos = {};
@@ -923,7 +931,7 @@ async function savePatrolRecord(dateStr, classId, period, data) {
     has_photo: data.has_photo || false,
     updated_at: new Date().toISOString()
   };
-  const { error } = await sb.from('patrol_records')
+  const { error } = await sb.from(TB('patrol_records'))
     .upsert(record, { onConflict: 'date,class_id,period' });
   if (error) throw error;
 }
@@ -965,7 +973,20 @@ function showAdminLogin() {
   document.getElementById('adminPassword').value = '';
   setTimeout(() => document.getElementById('adminPassword').focus(), 100);
 }
+function initLoginDept() {
+  const sel = document.getElementById('loginDept');
+  const grp = document.getElementById('loginDeptGroup');
+  if (!GRADE_CONFIG.depts) {
+    grp.style.display = 'none';
+    sel.innerHTML = '<option value="本级部">本级部</option>';
+    sel.value = '本级部';
+    return;
+  }
+  sel.innerHTML = '<option value="">请选择级部</option>' +
+    GRADE_CONFIG.depts.map(d => '<option value="' + d.name + '">' + deptRangeLabel(d) + '</option>').join('');
+}
 function populateGroupSelect() {
+  initLoginDept();
   const sel = document.getElementById('loginGroup');
   sel.innerHTML = '<option value="">请选择备课组</option>' +
     PATROL_GROUPS.map(g => '<option value="' + g + '">' + g + '</option>').join('');
@@ -994,12 +1015,12 @@ function updateTeacherList() {
   }
 }
 function doLogin() {
-  const dept = document.getElementById('loginDept').value;
+  const dept = GRADE_CONFIG.depts ? document.getElementById('loginDept').value : '本级部';
   const groupId = document.getElementById('loginGroup').value;
   const teacherId = document.getElementById('loginTeacher').value;
   const teacherName = document.getElementById('loginTeacher').selectedOptions[0]?.text || '';
   if (!dept || !groupId || !teacherId) {
-    showToast('请选择级部、备课组和教师', 'error');
+    showToast(GRADE_CONFIG.depts ? '请选择级部、备课组和教师' : '请选择备课组和教师', 'error');
     return;
   }
   state.role = 'teacher';
@@ -1076,18 +1097,20 @@ function onPeriodChange() {
 // ============================================
 // 级部判断与过滤
 // ============================================
-// 级部规则：701-707 一级部，708-713 二级部
+// 级部判断：按 GRADE_CONFIG.depts 的班级号范围计算；单级部配置(depts=null)时全部归入本级部
 function deptOfClass(name) {
-  const n = parseInt(name);
-  if (n >= 708) return '二级部';
-  return '一级部';
+  if (!GRADE_CONFIG.depts) return '本级部';
+  const n = parseInt(String(name).replace(/\D/g, ''), 10) % 100;
+  const d = GRADE_CONFIG.depts.find(x => n >= x.min && n <= x.max);
+  return d ? d.name : GRADE_CONFIG.depts[0].name;
 }
 function visibleClasses() {
   if (state.role === 'admin') return state.classes;
   return state.classes.filter(c => deptOfClass(c.name) === state.dept);
 }
 function currentDeptLabel() {
-  return state.role === 'admin' ? '两级部' : state.dept;
+  if (state.role === 'admin') return GRADE_CONFIG.depts ? '两级部' : '全年级';
+  return state.dept;
 }
 
 // ============================================
@@ -1252,7 +1275,7 @@ async function setReason(classId, period, item, reason) {
 }
 
 async function loadDailyNote(dateStr) {
-  const { data } = await sb.from('patrol_records')
+  const { data } = await sb.from(TB('patrol_records'))
     .select('remark').eq('date', dateStr).eq('class_id', '__daily__').eq('period', 0).maybeSingle();
   return data ? (data.remark || '') : '';
 }
@@ -1468,7 +1491,7 @@ async function onPhotoSelected(classId, period, input) {
     if (upErr) throw upErr;
     const photoUrl = getPhotoUrl(filePath);
     // Insert photo record with storage path
-    const { error } = await sb.from('patrol_photos').insert({
+    const { error } = await sb.from(TB('patrol_photos')).insert({
       id: photoId,
       date: state.viewDate,
       class_id: classId,
@@ -1506,7 +1529,7 @@ async function deletePhoto(classId, period, photoIdx) {
     if (ph.path) {
       await sb.storage.from('patrol-photos').remove([ph.path]);
     }
-    const { error } = await sb.from('patrol_photos').delete().eq('id', ph.id);
+    const { error } = await sb.from(TB('patrol_photos')).delete().eq('id', ph.id);
     if (error) throw error;
     state.photos[key].splice(photoIdx, 1);
     // Update has_photo flag
@@ -1557,7 +1580,7 @@ async function renderSummary() {
     await loadPatrolRecords(state.summaryDate);
     // Render stats（按级部分组统计）
     const visCls = visibleClasses();
-    const deptList = state.role === 'admin' ? ['一级部', '二级部'] : [state.dept];
+    const deptList = state.role === 'admin' ? (GRADE_CONFIG.depts ? GRADE_CONFIG.depts.map(d => d.name) : ['本级部']) : [state.dept];
     let statsHtml = '';
     let gTotal = 0, gA = 0, gB = 0, gC = 0, gSp = 0;
     deptList.forEach(d => {
@@ -1596,7 +1619,7 @@ async function renderSummary() {
     });
     if (state.role === 'admin') {
       statsHtml += `<div class="dept-stats dept-total">
-        <div class="dept-label">两级部合计（${visCls.length}班）</div>
+        <div class="dept-label">${GRADE_CONFIG.depts ? '两级部' : '全年级'}合计（${visCls.length}班）</div>
         <div class="dept-cards">
           <div class="stat-card"><div class="num" style="color:var(--primary)">${gTotal}</div><div class="lbl">已巡课</div></div>
           <div class="stat-card"><div class="num" style="color:var(--green)">${gA}</div><div class="lbl">A项</div></div>
@@ -1712,7 +1735,7 @@ async function renderFeedback() {
   state.feedbackDate = document.getElementById('feedbackDate').value || todayStr();
   try {
     await loadPatrolRecords(state.feedbackDate);
-    const { data } = await sb.from('patrol_summary').select('*').eq('date', state.feedbackDate).maybeSingle();
+    const { data } = await sb.from(TB('patrol_summary')).select('*').eq('date', state.feedbackDate).maybeSingle();
     document.getElementById('goodPoints').value = (data && data.good_points) || '';
     document.getElementById('issues').value = (data && data.issues) || '';
     document.getElementById('summaryText').value = (data && data.summary_text) || '';
@@ -1781,7 +1804,7 @@ async function saveFeedback() {
     updated_at: new Date().toISOString()
   };
   try {
-    const { error } = await sb.from('patrol_summary').upsert(data, { onConflict: 'date' });
+    const { error } = await sb.from(TB('patrol_summary')).upsert(data, { onConflict: 'date' });
     if (error) throw error;
     showToast('反馈已保存', 'success');
   } catch (err) {
@@ -1874,7 +1897,7 @@ async function exportStatsExcel() {
   try {
     const allData = {};
     for (const d of dates) {
-      const { data } = await sb.from('patrol_records').select('*').eq('date', d);
+      const { data } = await sb.from(TB('patrol_records')).select('*').eq('date', d);
       const records = {};
       if (data) data.forEach(r => { records[r.class_id + '_' + r.period] = r; });
       allData[d] = records;
@@ -2034,7 +2057,7 @@ async function addClass() {
   const id = 'pc' + Date.now();
   const maxSort = state.classes.length > 0 ? Math.max(...state.classes.map(c => c.sort_order || 0)) : -1;
   try {
-    const { error } = await sb.from('patrol_classes').insert({ id, name, sort_order: maxSort + 1 });
+    const { error } = await sb.from(TB('patrol_classes')).insert({ id, name, sort_order: maxSort + 1 });
     if (error) throw error;
     await loadClasses();
     renderClassSettings();
@@ -2047,7 +2070,7 @@ async function updateClass(id, field, value) {
   if (field === 'sort_order') value = parseInt(value) || 0;
   cls[field] = value;
   try {
-    const { error } = await sb.from('patrol_classes').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await sb.from(TB('patrol_classes')).update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) throw error;
     await loadClasses();
     showToast('已更新', 'success');
@@ -2056,16 +2079,16 @@ async function updateClass(id, field, value) {
 async function deleteClass(id) {
   if (!confirm('确定删除该班级吗？相关巡课数据也将删除。')) return;
   try {
-    await sb.from('patrol_classes').delete().eq('id', id);
-    await sb.from('patrol_schedule').delete().eq('class_id', id);
-    await sb.from('patrol_records').delete().eq('class_id', id);
+    await sb.from(TB('patrol_classes')).delete().eq('id', id);
+    await sb.from(TB('patrol_schedule')).delete().eq('class_id', id);
+    await sb.from(TB('patrol_records')).delete().eq('class_id', id);
     // Remove associated photos from storage
-    const { data: phRows } = await sb.from('patrol_photos').select('photo_path').eq('class_id', id);
+    const { data: phRows } = await sb.from(TB('patrol_photos')).select('photo_path').eq('class_id', id);
     if (phRows && phRows.length > 0) {
       const paths = phRows.map(r => r.photo_path).filter(Boolean);
       if (paths.length > 0) await sb.storage.from('patrol-photos').remove(paths);
     }
-    await sb.from('patrol_photos').delete().eq('class_id', id);
+    await sb.from(TB('patrol_photos')).delete().eq('class_id', id);
     await loadClasses();
     await loadSchedule();
     renderClassSettings();
@@ -2110,7 +2133,7 @@ async function addTeacher() {
   const id = 'pt' + Date.now();
   const maxSort = state.teachers.length > 0 ? Math.max(...state.teachers.map(t => t.sort_order || 0)) : -1;
   try {
-    const { error } = await sb.from('patrol_teachers').insert({ id, name, group_name: group, sort_order: maxSort + 1 });
+    const { error } = await sb.from(TB('patrol_teachers')).insert({ id, name, group_name: group, sort_order: maxSort + 1 });
     if (error) throw error;
     await loadTeachers();
     renderTeacherSettings();
@@ -2122,7 +2145,7 @@ async function updateTeacher(id, field, value) {
   if (!t) return;
   t[field] = value;
   try {
-    const { error } = await sb.from('patrol_teachers').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id);
+    const { error } = await sb.from(TB('patrol_teachers')).update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', id);
     if (error) throw error;
     await loadTeachers();
   } catch (err) { showToast('更新失败：' + err.message, 'error'); }
@@ -2130,7 +2153,7 @@ async function updateTeacher(id, field, value) {
 async function deleteTeacher(id) {
   if (!confirm('确定删除该教师吗？')) return;
   try {
-    await sb.from('patrol_teachers').delete().eq('id', id);
+    await sb.from(TB('patrol_teachers')).delete().eq('id', id);
     await loadTeachers();
     renderTeacherSettings();
     showToast('教师已删除', 'success');
@@ -2174,13 +2197,13 @@ async function updateSchedule(classId, period, field, value) {
   const existing = state.schedule[key];
   try {
     if (existing) {
-      const { error } = await sb.from('patrol_schedule').update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', existing.id);
+      const { error } = await sb.from(TB('patrol_schedule')).update({ [field]: value, updated_at: new Date().toISOString() }).eq('id', existing.id);
       if (error) throw error;
     } else {
       const id = 'ps' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
       const insertData = { id, class_id: classId, period };
       insertData[field] = value;
-      const { error } = await sb.from('patrol_schedule').insert(insertData);
+      const { error } = await sb.from(TB('patrol_schedule')).insert(insertData);
       if (error) throw error;
     }
     await loadSchedule();
@@ -2210,7 +2233,7 @@ function renderPeriodSettings() {
 }
 async function updatePeriod(period, field, value) {
   try {
-    const { error } = await sb.from('patrol_periods').update({ [field]: value, updated_at: new Date().toISOString() }).eq('period', period);
+    const { error } = await sb.from(TB('patrol_periods')).update({ [field]: value, updated_at: new Date().toISOString() }).eq('period', period);
     if (error) throw error;
     await loadPeriods();
     populatePeriodSelect();
@@ -2233,7 +2256,7 @@ async function renderStats() {
   // Load all dates
   const allData = {};
   for (const d of dates) {
-    const { data } = await sb.from('patrol_records').select('*').eq('date', d);
+    const { data } = await sb.from(TB('patrol_records')).select('*').eq('date', d);
     const records = {};
     if (data) data.forEach(r => { records[r.class_id + '_' + r.period] = { scores: r.scores || {}, reasons: r.reasons || {}, remark: r.remark || '', special: r.special || '', inspector: r.inspector || '' }; });
     allData[d] = records;
@@ -2401,14 +2424,14 @@ async function importClasses(input) {
     if (!confirm('导入将覆盖现有班级数据，确定继续吗？')) { input.value = ''; return; }
     showLoading('导入班级数据...');
     // Delete existing classes
-    await sb.from('patrol_classes').delete().neq('id', 'dummy');
+    await sb.from(TB('patrol_classes')).delete().neq('id', 'dummy');
     let added = 0;
     for (let i = 0; i < rows.length; i++) {
       const name = String(rows[i]['班级名称'] || '').trim();
       if (!name) continue;
       const sortOrder = parseInt(rows[i]['排序']) || i;
       const id = 'pc' + Date.now() + '_' + i;
-      const { error } = await sb.from('patrol_classes').insert({ id, name, sort_order: sortOrder });
+      const { error } = await sb.from(TB('patrol_classes')).insert({ id, name, sort_order: sortOrder });
       if (error) throw error;
       added++;
     }
@@ -2456,7 +2479,7 @@ async function importTeachers(input) {
     if (rows.length === 0) { showToast('Excel中没有数据', 'error'); return; }
     if (!confirm('导入将覆盖现有教师数据，确定继续吗？')) { input.value = ''; return; }
     showLoading('导入教师数据...');
-    await sb.from('patrol_teachers').delete().neq('id', 'dummy');
+    await sb.from(TB('patrol_teachers')).delete().neq('id', 'dummy');
     let added = 0;
     for (let i = 0; i < rows.length; i++) {
       const name = String(rows[i]['姓名'] || '').trim();
@@ -2465,7 +2488,7 @@ async function importTeachers(input) {
       if (!PATROL_GROUPS.includes(group)) { showToast('第' + (i+2) + '行备课组无效：' + group, 'error'); continue; }
       const sortOrder = parseInt(rows[i]['排序']) || i;
       const id = 'pt' + Date.now() + '_' + i;
-      const { error } = await sb.from('patrol_teachers').insert({ id, name, group_name: group, sort_order: sortOrder });
+      const { error } = await sb.from(TB('patrol_teachers')).insert({ id, name, group_name: group, sort_order: sortOrder });
       if (error) throw error;
       added++;
     }
@@ -2527,7 +2550,7 @@ async function importSchedule(input) {
         const teacher = row[teacherKey] !== undefined ? String(row[teacherKey] || '').trim() : '';
         const existing = state.schedule[cls.id + '_' + p.period];
         if (existing) {
-          const { error } = await sb.from('patrol_schedule').update({
+          const { error } = await sb.from(TB('patrol_schedule')).update({
             subject: subject || null,
             teacher_name: teacher || null,
             updated_at: new Date().toISOString()
@@ -2535,7 +2558,7 @@ async function importSchedule(input) {
           if (error) throw error;
         } else if (subject || teacher) {
           const id = 'ps' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
-          const { error } = await sb.from('patrol_schedule').insert({
+          const { error } = await sb.from(TB('patrol_schedule')).insert({
             id, class_id: cls.id, period: p.period,
             subject: subject || null, teacher_name: teacher || null
           });
@@ -2593,7 +2616,7 @@ async function importPeriods(input) {
       if (startTime) updateData.start_time = startTime;
       if (endTime) updateData.end_time = endTime;
       if (label) updateData.label = label;
-      const { error } = await sb.from('patrol_periods').update(updateData).eq('period', period);
+      const { error } = await sb.from(TB('patrol_periods')).update(updateData).eq('period', period);
       if (error) throw error;
       updated++;
     }
@@ -2648,7 +2671,7 @@ function escAttr(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 async function loadIssues() {
-  const { data, error } = await sb.from('patrol_issues').select('*').order('created_at', { ascending: false });
+  const { data, error } = await sb.from(TB('patrol_issues')).select('*').order('created_at', { ascending: false });
   if (error) throw error;
   state.issues = data || [];
 }
@@ -2709,7 +2732,7 @@ async function addIssue() {
   if (!content) { showToast('请填写问题描述', 'error'); return; }
   const id = 'iss_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
   try {
-    const { error } = await sb.from('patrol_issues').insert({ id, date, class_id, category, content, reporter, status: '待处理' });
+    const { error } = await sb.from(TB('patrol_issues')).insert({ id, date, class_id, category, content, reporter, status: '待处理' });
     if (error) throw error;
   } catch (err) { showToast('提交失败：' + err.message, 'error'); return; }
   state.issues.unshift({ id, date, class_id, category, content, reporter, status: '待处理', handler: null, solution: null, resolved_at: null });
@@ -2721,7 +2744,7 @@ async function addIssue() {
 async function updateIssueStatus(id, status) {
   const resolved = (status === '已解决' || status === '已关闭') ? new Date().toISOString() : null;
   try {
-    const { error } = await sb.from('patrol_issues').update({ status: status, resolved_at: resolved }).eq('id', id);
+    const { error } = await sb.from(TB('patrol_issues')).update({ status: status, resolved_at: resolved }).eq('id', id);
     if (error) throw error;
   } catch (err) { showToast('更新失败：' + err.message, 'error'); return; }
   const it = state.issues.find(x => x.id === id);
@@ -2731,7 +2754,7 @@ async function updateIssueStatus(id, status) {
 }
 async function updateIssueField(id, field, value) {
   try {
-    const { error } = await sb.from('patrol_issues').update({ [field]: value }).eq('id', id);
+    const { error } = await sb.from(TB('patrol_issues')).update({ [field]: value }).eq('id', id);
     if (error) throw error;
   } catch (err) { showToast('更新失败：' + err.message, 'error'); return; }
   const it = state.issues.find(x => x.id === id);
@@ -2740,7 +2763,7 @@ async function updateIssueField(id, field, value) {
 async function deleteIssue(id) {
   if (!confirm('确定删除该问题记录吗？')) return;
   try {
-    const { error } = await sb.from('patrol_issues').delete().eq('id', id);
+    const { error } = await sb.from(TB('patrol_issues')).delete().eq('id', id);
     if (error) throw error;
   } catch (err) { showToast('删除失败：' + err.message, 'error'); return; }
   state.issues = state.issues.filter(x => x.id !== id);
