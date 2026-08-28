@@ -734,14 +734,42 @@ function deptRangeLabel(d) {
   return d.name + '（' + (pre + d.min) + '-' + (pre + d.max) + '）';
 }
 // 有效学科列表 = 年级默认学科 ∪ 教师表中已出现的学科（教务处导入或新增新学科教师后自动出现）
+function lsGetJSON(key) {
+  try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+function lsSetJSON(key, arr) { localStorage.setItem(key, JSON.stringify(arr)); }
 function allGroups() {
   const base = (GRADE_CONFIG.groups && GRADE_CONFIG.groups.length) ? GRADE_CONFIG.groups : PATROL_GROUPS;
+  const hidden = lsGetJSON(HIDDEN_GROUPS_KEY);
+  const custom = lsGetJSON(CUSTOM_GROUPS_KEY);
+  const list = base.filter(g => hidden.indexOf(g) < 0).concat(custom);
   const extra = [];
   (state.teachers || []).forEach(t => {
     const g = String(t.group_name || '').trim();
-    if (g && base.indexOf(g) < 0 && extra.indexOf(g) < 0) extra.push(g);
+    if (g && list.indexOf(g) < 0 && extra.indexOf(g) < 0) extra.push(g);
   });
-  return base.concat(extra);
+  return list.concat(extra);
+}
+// 各学科教师数统计
+function groupTeacherCount(g) {
+  return (state.teachers || []).filter(t => String(t.group_name || '').trim() === g).length;
+}
+// 删除学科：有教师时禁止；默认学科记录隐藏，自定义学科移除，动态学科无教师本就不显示
+function deleteGroup(g) {
+  const n = groupTeacherCount(g);
+  if (n > 0) { showToast('该学科下还有 ' + n + ' 名教师，请先移除或调整他们的备课组', 'error'); return; }
+  if (!confirm('确定删除学科「' + g + '」吗？')) return;
+  const base = (GRADE_CONFIG.groups && GRADE_CONFIG.groups.length) ? GRADE_CONFIG.groups : PATROL_GROUPS;
+  if (base.indexOf(g) >= 0) {
+    const hidden = lsGetJSON(HIDDEN_GROUPS_KEY);
+    if (hidden.indexOf(g) < 0) hidden.push(g);
+    lsSetJSON(HIDDEN_GROUPS_KEY, hidden);
+  }
+  const custom = lsGetJSON(CUSTOM_GROUPS_KEY).filter(x => x !== g);
+  lsSetJSON(CUSTOM_GROUPS_KEY, custom);
+  renderTeacherSettings();
+  populateGroupSelect();
+  showToast('学科「' + g + '」已删除', 'success');
 }
 const SCORE_ITEMS = ['教室环境', '课堂纪律', '学习状态'];
 const SCORE_GRADES = ['A', 'B', 'C'];
@@ -803,6 +831,8 @@ const state = {
 
 const LAST_TEACHER_KEY = 'patrol_last_teacher';
 const LAST_GROUP_KEY = 'patrol_last_group';
+const CUSTOM_GROUPS_KEY = 'patrol_custom_groups';
+const HIDDEN_GROUPS_KEY = 'patrol_hidden_groups';
 
 // ============================================
 // 工具函数
@@ -998,10 +1028,11 @@ function initLoginDept() {
 function populateGroupSelect() {
   initLoginDept();
   const sel = document.getElementById('loginGroup');
+  const avail = allGroups().filter(g => groupTeacherCount(g) > 0);
   sel.innerHTML = '<option value="">请选择备课组</option>' +
-    allGroups().map(g => '<option value="' + g + '">' + g + '</option>').join('');
+    avail.map(g => '<option value="' + g + '">' + g + '</option>').join('');
   const lastGroup = localStorage.getItem(LAST_GROUP_KEY);
-  if (lastGroup && allGroups().includes(lastGroup)) {
+  if (lastGroup && avail.includes(lastGroup)) {
     sel.value = lastGroup;
     updateTeacherList();
   }
@@ -2120,6 +2151,18 @@ function renderTeacherSettings() {
   html += '<button class="btn btn-outline btn-sm" onclick="exportTeachersTemplate()">📥 导出Excel模板</button>';
   html += '<label class="btn btn-outline btn-sm" style="cursor:pointer">📤 导入Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importTeachers(this)"></label>';
   html += '</div></div>';
+  // 学科管理卡片
+  const baseG = (GRADE_CONFIG.groups && GRADE_CONFIG.groups.length) ? GRADE_CONFIG.groups : PATROL_GROUPS;
+  html += '<div class="settings-card"><div class="card-title">学科管理</div>';
+  html += '<div style="font-size:13px;color:var(--text2);margin-bottom:8px">删除学科前需先移除该学科下的教师；删除后登录界面将不再显示该学科。学科会随教师名单导入自动出现。</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+  allGroups().forEach(g => {
+    const n = groupTeacherCount(g);
+    const isBase = baseG.indexOf(g) >= 0;
+    html += '<span style="display:inline-flex;align-items:center;gap:4px;background:' + (isBase ? 'var(--light)' : '#FFF3E0') + ';border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:13px">' + escapeAttr(g) + ' <span style="color:var(--text2)">(' + n + '人' + (isBase ? '·默认' : '') + ')</span>';
+    html += '<span class="remove-x" style="font-size:14px;padding:0 2px" title="删除学科" onclick="deleteGroup(\'' + escapeAttr(g) + '\')">×</span></span>';
+  });
+  html += '</div></div>';
   html += '<div class="settings-card"><div class="card-title">教师列表</div>';
   if (state.teachers.length === 0) {
     html += '<div class="empty-state"><div class="text">暂无教师</div><div class="hint">添加后巡课老师可登录</div></div>';
@@ -2145,6 +2188,10 @@ async function addTeacher() {
     const ng = prompt('请输入新学科/备课组名称：');
     if (!ng || !ng.trim()) return;
     group = ng.trim();
+    const custom = lsGetJSON(CUSTOM_GROUPS_KEY);
+    if (custom.indexOf(group) < 0) { custom.push(group); lsSetJSON(CUSTOM_GROUPS_KEY, custom); }
+    const sel = document.getElementById('newTeacherGroup');
+    if (sel) { sel.value = group; }
   }
   if (!name) { showToast('请输入教师姓名', 'error'); return; }
   const id = 'pt' + Date.now();
