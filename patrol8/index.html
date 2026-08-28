@@ -725,13 +725,23 @@ const ADMIN_PASSWORD = 'EQjwc';
 const PATROL_GROUPS = ['语文', '数学', '英语', '道法', '历史', '综合组'];
 
 // ===== 学年配置（构建脚本按年级替换此块）=====
-const GRADE_CONFIG = {"grade": "八年级", "dir": "patrol8", "subtitle": "武汉市二桥中学 · 知音八年级", "classPrefix": 8, "suffix": "_g8", "depts": [{"name": "一级部", "min": 1, "max": 8}, {"name": "二级部", "min": 9, "max": 16}]};
+const GRADE_CONFIG = {"grade": "八年级", "dir": "patrol8", "subtitle": "武汉市二桥中学 · 知音八年级", "classPrefix": 8, "suffix": "_g8", "groups": ["语文", "数学", "英语", "物理", "道法", "历史", "综合组"], "depts": [{"name": "一级部", "min": 1, "max": 8}, {"name": "二级部", "min": 9, "max": 16}]};
 // 表名辅助：八年级表带 _g8 后缀，九年级带 _g9 后缀，七年级无后缀
 function TB(name) { return name + GRADE_CONFIG.suffix; }
 // 级部范围标签，如 一级部（701-707）
 function deptRangeLabel(d) {
   const pre = GRADE_CONFIG.classPrefix * 100;
   return d.name + '（' + (pre + d.min) + '-' + (pre + d.max) + '）';
+}
+// 有效学科列表 = 年级默认学科 ∪ 教师表中已出现的学科（教务处导入或新增新学科教师后自动出现）
+function allGroups() {
+  const base = (GRADE_CONFIG.groups && GRADE_CONFIG.groups.length) ? GRADE_CONFIG.groups : PATROL_GROUPS;
+  const extra = [];
+  (state.teachers || []).forEach(t => {
+    const g = String(t.group_name || '').trim();
+    if (g && base.indexOf(g) < 0 && extra.indexOf(g) < 0) extra.push(g);
+  });
+  return base.concat(extra);
 }
 const SCORE_ITEMS = ['教室环境', '课堂纪律', '学习状态'];
 const SCORE_GRADES = ['A', 'B', 'C'];
@@ -989,9 +999,9 @@ function populateGroupSelect() {
   initLoginDept();
   const sel = document.getElementById('loginGroup');
   sel.innerHTML = '<option value="">请选择备课组</option>' +
-    PATROL_GROUPS.map(g => '<option value="' + g + '">' + g + '</option>').join('');
+    allGroups().map(g => '<option value="' + g + '">' + g + '</option>').join('');
   const lastGroup = localStorage.getItem(LAST_GROUP_KEY);
-  if (lastGroup && PATROL_GROUPS.includes(lastGroup)) {
+  if (lastGroup && allGroups().includes(lastGroup)) {
     sel.value = lastGroup;
     updateTeacherList();
   }
@@ -2102,8 +2112,9 @@ function renderTeacherSettings() {
   let html = '<div class="settings-card"><div class="card-title">添加教师</div>';
   html += '<div class="add-row">';
   html += '<input type="text" id="newTeacherName" placeholder="教师姓名" style="width:100px">';
-  html += '<select id="newTeacherGroup" style="width:100px">';
-  PATROL_GROUPS.forEach(g => { html += '<option value="' + g + '">' + g + '</option>'; });
+  html += '<select id="newTeacherGroup" style="width:130px">';
+  allGroups().forEach(g => { html += '<option value="' + g + '">' + g + '</option>'; });
+  html += '<option value="__new__">＋新增学科</option>';
   html += '</select>';
   html += '<button class="btn btn-primary btn-sm" onclick="addTeacher()">+ 添加</button>';
   html += '<button class="btn btn-outline btn-sm" onclick="exportTeachersTemplate()">📥 导出Excel模板</button>';
@@ -2117,7 +2128,8 @@ function renderTeacherSettings() {
     state.teachers.forEach(t => {
       html += '<tr><td><input type="text" value="' + escapeAttr(t.name) + '" onchange="updateTeacher(\'' + t.id + '\',\'name\',this.value)"></td>';
       html += '<td><select onchange="updateTeacher(\'' + t.id + '\',\'group_name\',this.value)">';
-      PATROL_GROUPS.forEach(g => { html += '<option value="' + g + '"' + (t.group_name === g ? ' selected' : '') + '>' + g + '</option>'; });
+      const rowGroups = allGroups().concat(t.group_name && allGroups().indexOf(t.group_name) < 0 ? [t.group_name] : []);
+      rowGroups.forEach(g => { html += '<option value="' + g + '"' + (t.group_name === g ? ' selected' : '') + '>' + g + '</option>'; });
       html += '</select></td>';
       html += '<td><span class="remove-x" onclick="deleteTeacher(\'' + t.id + '\')">×</span></td></tr>';
     });
@@ -2128,7 +2140,12 @@ function renderTeacherSettings() {
 }
 async function addTeacher() {
   const name = document.getElementById('newTeacherName').value.trim();
-  const group = document.getElementById('newTeacherGroup').value;
+  let group = document.getElementById('newTeacherGroup').value;
+  if (group === '__new__') {
+    const ng = prompt('请输入新学科/备课组名称：');
+    if (!ng || !ng.trim()) return;
+    group = ng.trim();
+  }
   if (!name) { showToast('请输入教师姓名', 'error'); return; }
   const id = 'pt' + Date.now();
   const maxSort = state.teachers.length > 0 ? Math.max(...state.teachers.map(t => t.sort_order || 0)) : -1;
@@ -2485,7 +2502,7 @@ async function importTeachers(input) {
       const name = String(rows[i]['姓名'] || '').trim();
       if (!name) continue;
       const group = String(rows[i]['备课组'] || '').trim();
-      if (!PATROL_GROUPS.includes(group)) { showToast('第' + (i+2) + '行备课组无效：' + group, 'error'); continue; }
+      if (!group) { showToast('第' + (i+2) + '行缺少备课组，已跳过', 'error'); continue; }
       const sortOrder = parseInt(rows[i]['排序']) || i;
       const id = 'pt' + Date.now() + '_' + i;
       const { error } = await sb.from(TB('patrol_teachers')).insert({ id, name, group_name: group, sort_order: sortOrder });
