@@ -725,7 +725,7 @@ const ADMIN_PASSWORD = 'EQjwc';
 const PATROL_GROUPS = ['语文', '数学', '英语', '道法', '历史', '综合组'];
 
 // ===== 学年配置（构建脚本按年级替换此块）=====
-const GRADE_CONFIG = {"grade": "七年级", "dir": "patrol", "subtitle": "武汉市二桥中学 · 知音七年级", "classPrefix": 7, "suffix": "", "groups": ["语文", "数学", "英语", "道法", "历史", "综合组"], "depts": [{"name": "一级部", "min": 1, "max": 7}, {"name": "二级部", "min": 8, "max": 13}]};
+const GRADE_CONFIG = {"grade": "七年级", "dir": "patrol", "subtitle": "武汉市二桥中学 · 知音七年级", "classPrefix": 7, "suffix": "", "groups": ["语文", "数学", "英语", "道法", "历史", "综合组"], "depts": null};
 // 表名辅助：八年级表带 _g8 后缀，九年级带 _g9 后缀，七年级无后缀
 function TB(name) { return name + GRADE_CONFIG.suffix; }
 // 级部范围标签，如 一级部（701-707）
