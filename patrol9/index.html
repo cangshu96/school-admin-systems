@@ -815,6 +815,7 @@ const state = {
   records: {},
   photos: {},
   currentPeriod: 1,
+  scheduleWeekday: 0,  // 0=跟随今天; 1-5=教务处课表界面选中星期
   viewDate: todayStr(),
   role: null,
   teacher: null,
@@ -906,8 +907,8 @@ async function loadSchedule() {
   state.schedule = {};
   if (data) {
     data.forEach(row => {
-      const key = row.class_id + '_' + row.period;
-      state.schedule[key] = { subject: row.subject, teacher_name: row.teacher_name, id: row.id };
+      const key = row.class_id + '_' + (row.weekday || 1) + '_' + row.period;
+      state.schedule[key] = { subject: row.subject, teacher_name: row.teacher_name, id: row.id, weekday: row.weekday || 1 };
     });
   }
 }
@@ -994,8 +995,13 @@ function getPeriodInfo(period) {
   return state.periods.find(p => p.period === period) || null;
 }
 
-function getSchedule(classId, period) {
-  return state.schedule[classId + '_' + period] || null;
+function todayWd() {
+  const d = new Date().getDay();
+  return (d >= 1 && d <= 5) ? d : 1;
+}
+function getSchedule(classId, period, wd) {
+  const w = wd || (state.scheduleWeekday || todayWd());
+  return state.schedule[classId + '_' + w + '_' + period] || null;
 }
 
 // ============================================
@@ -2228,7 +2234,15 @@ async function deleteTeacher(id) {
 function renderScheduleSettings() {
   const c = document.getElementById('settingsSchedule');
   let html = '<div class="settings-card"><div class="card-title">课表配置</div>';
-  html += '<div style="font-size:13px;color:var(--text2);margin-bottom:8px">为每个班级的每个节次设置课程和上课教师</div>';
+  html += '<div style="font-size:13px;color:var(--text2);margin-bottom:8px">为每个班级的每个节次设置课程和上课教师（按星期区分，巡课界面自动显示当天课表）</div>';
+  html += '<div class="add-row" style="margin-bottom:8px">';
+  const wdNames = ['', '周一', '周二', '周三', '周四', '周五'];
+  if (!state.scheduleWeekday) state.scheduleWeekday = todayWd();
+  for (let w = 1; w <= 5; w++) {
+    const on = state.scheduleWeekday === w;
+    html += '<button class="btn ' + (on ? 'btn-primary' : 'btn-outline') + ' btn-sm" onclick="switchScheduleWd(' + w + ')">' + wdNames[w] + (w === todayWd() ? '·今' : '') + '</button>';
+  }
+  html += '</div>';
   html += '<div class="add-row" style="margin-bottom:8px">';
   html += '<button class="btn btn-outline btn-sm" onclick="exportScheduleTemplate()">📥 导出Excel模板</button>';
   html += '<label class="btn btn-outline btn-sm" style="cursor:pointer">📤 导入Excel<input type="file" accept=".xlsx,.xls" style="display:none" onchange="importSchedule(this)"></label>';
@@ -2243,7 +2257,7 @@ function renderScheduleSettings() {
     state.classes.forEach(cls => {
       html += '<tr><td class="class-col">' + cls.name + '</td>';
       state.periods.forEach(p => {
-        const sched = getSchedule(cls.id, p.period);
+        const sched = getSchedule(cls.id, p.period, state.scheduleWeekday);
         const subject = sched ? sched.subject || '' : '';
         const teacher = sched ? sched.teacher_name || '' : '';
         html += '<td><input type="text" placeholder="课程" value="' + escapeAttr(subject) + '" style="margin-bottom:2px" onchange="updateSchedule(\'' + cls.id + '\',' + p.period + ',\'subject\',this.value)">';
@@ -2256,8 +2270,13 @@ function renderScheduleSettings() {
   html += '</div>';
   c.innerHTML = html;
 }
+function switchScheduleWd(w) {
+  state.scheduleWeekday = w;
+  renderScheduleSettings();
+}
 async function updateSchedule(classId, period, field, value) {
-  const key = classId + '_' + period;
+  const wd = state.scheduleWeekday || todayWd();
+  const key = classId + '_' + wd + '_' + period;
   const existing = state.schedule[key];
   try {
     if (existing) {
@@ -2265,7 +2284,7 @@ async function updateSchedule(classId, period, field, value) {
       if (error) throw error;
     } else {
       const id = 'ps' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
-      const insertData = { id, class_id: classId, period };
+      const insertData = { id, class_id: classId, period, weekday: wd };
       insertData[field] = value;
       const { error } = await sb.from(TB('patrol_schedule')).insert(insertData);
       if (error) throw error;
@@ -2572,11 +2591,11 @@ async function exportScheduleTemplate() {
   await loadLib('xlsx').catch(e => showToast(e.message, 'error'));
   if (state.classes.length === 0) { showToast('请先添加班级', 'error'); return; }
   // Build schedule data: each row = one class, columns = periods (subject|teacher)
-  const headers = ['班级'];
+  const headers = ['班级', '星期'];
   state.periods.forEach(p => { headers.push(p.label + '_课程'); headers.push(p.label + '_教师'); });
   const data = [];
   state.classes.forEach(cls => {
-    const row = { '班级': cls.name };
+    const row = { '班级': cls.name, '星期': state.scheduleWeekday || todayWd() };
     state.periods.forEach(p => {
       const sched = getSchedule(cls.id, p.period);
       row[p.label + '_课程'] = sched ? sched.subject || '' : '';
@@ -2607,28 +2626,35 @@ async function importSchedule(input) {
       const className = String(row['班级'] || '').trim();
       const cls = state.classes.find(c => c.name === className);
       if (!cls) continue;
-      for (const p of state.periods) {
-        const subjectKey = p.label + '_课程';
-        const teacherKey = p.label + '_教师';
-        const subject = row[subjectKey] !== undefined ? String(row[subjectKey] || '').trim() : '';
-        const teacher = row[teacherKey] !== undefined ? String(row[teacherKey] || '').trim() : '';
-        const existing = state.schedule[cls.id + '_' + p.period];
-        if (existing) {
-          const { error } = await sb.from(TB('patrol_schedule')).update({
-            subject: subject || null,
-            teacher_name: teacher || null,
-            updated_at: new Date().toISOString()
-          }).eq('id', existing.id);
-          if (error) throw error;
-        } else if (subject || teacher) {
-          const id = 'ps' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
-          const { error } = await sb.from(TB('patrol_schedule')).insert({
-            id, class_id: cls.id, period: p.period,
-            subject: subject || null, teacher_name: teacher || null
-          });
-          if (error) throw error;
+      let wds = [1, 2, 3, 4, 5];
+      if (row['星期'] !== undefined && String(row['星期'] || '').trim() !== '') {
+        const w = parseInt(String(row['星期']).replace(/[^1-5]/g, ''), 10);
+        wds = (w >= 1 && w <= 5) ? [w] : wds;
+      }
+      for (const wd of wds) {
+        for (const p of state.periods) {
+          const subjectKey = p.label + '_课程';
+          const teacherKey = p.label + '_教师';
+          const subject = row[subjectKey] !== undefined ? String(row[subjectKey] || '').trim() : '';
+          const teacher = row[teacherKey] !== undefined ? String(row[teacherKey] || '').trim() : '';
+          const existing = state.schedule[cls.id + '_' + wd + '_' + p.period];
+          if (existing) {
+            const { error } = await sb.from(TB('patrol_schedule')).update({
+              subject: subject || null,
+              teacher_name: teacher || null,
+              updated_at: new Date().toISOString()
+            }).eq('id', existing.id);
+            if (error) throw error;
+          } else if (subject || teacher) {
+            const id = 'ps' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+            const { error } = await sb.from(TB('patrol_schedule')).insert({
+              id, class_id: cls.id, period: p.period, weekday: wd,
+              subject: subject || null, teacher_name: teacher || null
+            });
+            if (error) throw error;
+          }
+          updated++;
         }
-        updated++;
       }
     }
     await loadSchedule();
