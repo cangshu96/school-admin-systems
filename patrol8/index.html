@@ -1637,6 +1637,18 @@ function closePhotoModal(e) {
 // ============================================
 // 汇总 Tab
 // ============================================
+function showImageOverlay(dataURL, filename) {
+  let ov = document.getElementById('imageOverlay');
+  if (ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'imageOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML = '<div style="color:#fff;font-size:15px;margin-bottom:10px;text-align:center;line-height:1.6">📋 ' + escapeAttr(filename) + '<br><span style="font-size:13px;opacity:.9">长按下方图片，选择"保存图片"到相册</span></div>' +
+    '<div style="max-width:100%;max-height:68vh;overflow:auto;-webkit-overflow-scrolling:touch"><img src="' + dataURL + '" style="max-width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.4);display:block" alt="巡课汇总"></div>' +
+    '<button class="btn btn-primary" style="margin-top:12px;min-width:120px" onclick="document.getElementById(\'imageOverlay\').remove()">关闭</button>';
+  ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+}
 async function exportSummaryImage() {
   const btn = document.getElementById('exportImgBtn');
   const statsEl = document.getElementById('summaryStats');
@@ -1670,12 +1682,20 @@ async function exportSummaryImage() {
     document.body.appendChild(wrap);
     try {
       const canvas = await html2canvas(wrap, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-      // 下载
-      const a = document.createElement('a');
-      a.download = GRADE_CONFIG.grade + '巡课汇总_' + dateVal + '.png';
-      a.href = canvas.toDataURL('image/png');
-      a.click();
-      showToast('图片已导出', 'success');
+      const dataURL = canvas.toDataURL('image/png');
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(navigator.userAgent) || /QQ|MicroMessenger/i.test(navigator.userAgent);
+      if (isMobile) {
+        // 手机/QQ/微信：直接下载会得到0B空文件，改为弹层展示，长按保存
+        showImageOverlay(dataURL, GRADE_CONFIG.grade + '巡课汇总_' + dateVal + '.png');
+      } else {
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.download = GRADE_CONFIG.grade + '巡课汇总_' + dateVal + '.png';
+        a.href = url;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
     } finally {
       document.body.removeChild(wrap);
     }
