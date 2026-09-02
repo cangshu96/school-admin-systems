@@ -105,6 +105,11 @@ body {
 .btn-sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
 .btn-block { width: 100%; }
 .login-card .btn-block { padding: 12px; font-size: 16px; margin-top: 8px; }
+#patrolPlanBox { margin-top: 14px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--light); }
+#patrolPlanBox .plan-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 6px; text-align: center; }
+#patrolPlanBox .plan-row { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 6px; border-radius: 6px; }
+#patrolPlanBox .plan-row.today { background: var(--primary); color: #fff; font-weight: 600; }
+#patrolPlanBox .plan-row .day { color: inherit; }
 .admin-link { display: block; text-align: center; margin-top: 16px; font-size: 13px; color: var(--primary); cursor: pointer; }
 .admin-link:hover { text-decoration: underline; }
 
@@ -467,6 +472,7 @@ body { font-size: 16px; line-height: 1.5; }
       </select>
     </div>
     <button class="btn btn-primary btn-block" onclick="doLogin()">登录巡课</button>
+    <div id="patrolPlanBox"></div>
     <div class="admin-link" onclick="showAdminLogin()">教务处入口</div>
   </div>
 </div>
@@ -1031,8 +1037,20 @@ function initLoginDept() {
   sel.innerHTML = '<option value="">请选择级部</option>' +
     GRADE_CONFIG.depts.map(d => '<option value="' + d.name + '">' + deptRangeLabel(d) + '</option>').join('');
 }
+function renderPatrolPlan() {
+  const PLAN = { 1: '数学', 2: '历史', 3: '语文', 4: '道法', 5: '英语' };
+  const NAMES = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五' };
+  const today = todayWd();
+  let h = '<div class="plan-title">📚 本周巡课学科安排</div>';
+  for (let d = 1; d <= 5; d++) {
+    h += '<div class="plan-row' + (d === today ? ' today' : '') + '"><span class="day">' + NAMES[d] + (d === today ? ' ·今天' : '') + '</span><span>' + PLAN[d] + '</span></div>';
+  }
+  const box = document.getElementById('patrolPlanBox');
+  if (box) box.innerHTML = h;
+}
 function populateGroupSelect() {
   initLoginDept();
+  renderPatrolPlan();
   const sel = document.getElementById('loginGroup');
   const avail = allGroups().filter(g => groupTeacherCount(g) > 0);
   sel.innerHTML = '<option value="">请选择备课组</option>' +
