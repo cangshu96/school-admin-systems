@@ -558,6 +558,7 @@ body { font-size: 16px; line-height: 1.5; }
     <div class="summary-table-wrap" id="summaryGrid"></div>
     <div style="margin-top:12px">
       <button class="btn btn-outline btn-sm" onclick="exportSummary()">导出汇总CSV</button>
+      <button class="btn btn-outline btn-sm" id="exportImgBtn" onclick="exportSummaryImage()">📷 导出图片</button>
     </div>
   </div>
 
@@ -681,11 +682,12 @@ body { font-size: 16px; line-height: 1.5; }
 // ============ 按需加载库 ============
 const __CDN = {
   chart: 'https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
-  xlsx: 'https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+  xlsx: 'https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  html2canvas: 'https://cdn.bootcdn.net/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
 };
 function loadLib(name) {
   return new Promise((resolve, reject) => {
-    const globalName = name === 'chart' ? 'Chart' : 'XLSX';
+    const globalName = name === 'chart' ? 'Chart' : (name === 'html2canvas' ? 'html2canvas' : 'XLSX');
     if (window[globalName]) return resolve();
     const s = document.createElement('script');
     s.src = __CDN[name];
@@ -1635,6 +1637,55 @@ function closePhotoModal(e) {
 // ============================================
 // 汇总 Tab
 // ============================================
+async function exportSummaryImage() {
+  const btn = document.getElementById('exportImgBtn');
+  const statsEl = document.getElementById('summaryStats');
+  const gridEl = document.getElementById('summaryGrid');
+  const dateVal = document.getElementById('summaryDate').value || todayStr();
+  if (!gridEl.querySelector('table')) { showToast('暂无汇总数据可导出', 'error'); return; }
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '生成图片中...';
+  try {
+    await loadLib('html2canvas').catch(e => showToast(e.message, 'error'));
+    // 组装离屏容器：标题+日期+统计+表格（克隆节点，不影响页面）
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;padding:20px;width:' + Math.min(1180, Math.max(900, gridEl.querySelector('table').offsetWidth + 40)) + 'px;box-sizing:border-box;font-family:sans-serif;';
+    const head = document.createElement('div');
+    head.style.cssText = 'text-align:center;margin-bottom:14px;';
+    head.innerHTML = '<div style="font-size:20px;font-weight:700;color:#1F4E79;">' + GRADE_CONFIG.grade + '巡课汇总（' + dateVal + '）</div>' +
+      '<div style="font-size:13px;color:#666;margin-top:4px;">' + currentDeptLabel() + ' · ' + GRADE_CONFIG.subtitle + '</div>';
+    wrap.appendChild(head);
+    if (statsEl) wrap.appendChild(statsEl.cloneNode(true));
+    const gridClone = gridEl.cloneNode(true);
+    gridClone.style.overflowX = 'visible';
+    // 展平克隆表格宽度，避免截图截断滚动区
+    const tbl = gridClone.querySelector('table');
+    if (tbl) { tbl.style.minWidth = '0'; tbl.style.width = '100%'; }
+    wrap.appendChild(gridClone);
+    const foot = document.createElement('div');
+    foot.style.cssText = 'text-align:right;font-size:12px;color:#999;margin-top:10px;';
+    foot.textContent = '导出时间 ' + new Date().toLocaleString('zh-CN');
+    wrap.appendChild(foot);
+    document.body.appendChild(wrap);
+    try {
+      const canvas = await html2canvas(wrap, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      // 下载
+      const a = document.createElement('a');
+      a.download = GRADE_CONFIG.grade + '巡课汇总_' + dateVal + '.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+      showToast('图片已导出', 'success');
+    } finally {
+      document.body.removeChild(wrap);
+    }
+  } catch (err) {
+    showToast('导出失败：' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
 async function renderSummary() {
   state.summaryDate = document.getElementById('summaryDate').value || todayStr();
   const container = document.getElementById('summaryGrid');
