@@ -1230,7 +1230,9 @@ function renderClassCard(cls, rec, subject, teacher, photos) {
   if (subject || teacher) {
     html += '<div class="subject-teacher">' + (subject || '未配置') + (teacher ? ' · ' + teacher : '') + '</div>';
   } else {
-    html += '<div class="class-info">课表未配置</div>';
+    // 区分：当天该班有排课但本节无课 vs 完全未配置课表
+    const hasAnyToday = state.periods.some(p => { const s = getSchedule(cls.id, p.period); return s && (s.subject || s.teacher_name); });
+    html += '<div class="class-info">' + (hasAnyToday ? '本节未排课' : '课表未配置') + '</div>';
   }
   html += '</div>';
   // Photo button
