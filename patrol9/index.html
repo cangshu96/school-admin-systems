@@ -1929,6 +1929,7 @@ async function generateFeedback() {
   const keepArr = [];
   const allAClasses = [], dutyCount = { n: 0 };
   const posNotes = [];
+  const clsRemarks = [];
   const tagCount = {};   // 负面标签聚类: tag -> [班级]
   const bcPeriods = {};  // B/C 出现的节次label
   clsList.forEach(cls => {
@@ -1956,10 +1957,15 @@ async function generateFeedback() {
         }
       });
       if (rec.remark && !/__daily__/.test(cls.id)) {
-        // 班级备注进入 Improve 素材
-        const k = '备注：' + rec.remark;
-        if (!tagCount[k]) tagCount[k] = [];
-        tagCount[k].push(cls.name);
+        // 班级备注：负面关键词归Improve，其余（正面/中性描述）归Keep
+        const NEG = /睡觉|趴|讲话|纪律|迟到|早退|玩手机|混乱|吵|打闹|追跑|发呆|走神|没带|未带|缺|不认真|不专注|提醒|批评|问题|不足|差|乱/i;
+        if (NEG.test(rec.remark)) {
+          const k = '备注：' + rec.remark;
+          if (!tagCount[k]) tagCount[k] = [];
+          tagCount[k].push(cls.name);
+        } else {
+          clsRemarks.push({ cls: cls.name, text: rec.remark });
+        }
       }
     });
     if (allA) allAClasses.push(cls.name);
@@ -1974,6 +1980,7 @@ async function generateFeedback() {
   }
   if (dutyCount.n > 0) keepArr.push(dutyCount.n + ' 个班次出现班主任坐班，班务管理到位');
   posNotes.forEach(n => keepArr.push(n));
+  clsRemarks.forEach(r => keepArr.push(r.cls + ' ' + r.text));
   // ---- Improve：标签聚类（只报现象+涉及班级） ----
   const improveArr = [];
   Object.keys(tagCount).sort((a, b) => tagCount[b].length - tagCount[a].length).forEach(tag => {
