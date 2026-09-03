@@ -1771,7 +1771,7 @@ async function renderSummary() {
     statsEl.innerHTML = statsHtml;
 
     // Render grid
-    let html = '<table class="summary-table"><thead><tr><th>班级</th>';
+    let html = '<div style="font-size:12px;color:var(--text2);margin-bottom:6px">💬 有备注 · 📷 有照片 · 👨\u200d🏫 班主任坐班 · 点击单元格查看详情</div><table class="summary-table"><thead><tr><th>班级</th>';
     // Add period columns
     state.periods.forEach(p => {
       html += '<th>' + p.label + '<br><span style="font-size:10px;font-weight:400">' + p.start_time + '</span></th>';
@@ -1797,7 +1797,7 @@ async function renderSummary() {
           let cellClass = '';
           if (rec.remark) cellClass += ' cell-has-remark';
           if (rec.has_photo) cellClass += ' cell-has-photo';
-          html += '<td class="' + cellClass.trim() + '" style="cursor:pointer" onclick="showCellDetail(\'' + cls.id + '\',' + p.period + ')">' + grades.join(' ') + (rec.has_photo ? ' 📷' : '') + duty + '</td>';
+          html += '<td class="' + cellClass.trim() + '" style="cursor:pointer" onclick="showCellDetail(\'' + cls.id + '\',' + p.period + ')">' + grades.join(' ') + (rec.remark ? ' 💬' : '') + (rec.has_photo ? ' 📷' : '') + duty + '</td>';
         }
       });
       // Show inspectors for this class
