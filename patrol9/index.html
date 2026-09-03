@@ -2079,6 +2079,15 @@ async function exportFeedbackImage() {
     wrap.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;padding:48px 56px;width:760px;box-sizing:border-box;';
     document.body.appendChild(wrap);
     try {
+      // 等校徽图片加载完成再截图
+      const logoImg = wrap.querySelector('.k-logo img');
+      if (logoImg) {
+        await new Promise((resolve) => {
+          if (logoImg.complete && logoImg.naturalWidth > 0) return resolve();
+          logoImg.onload = resolve; logoImg.onerror = resolve;
+          setTimeout(resolve, 5000);
+        });
+      }
       const canvas = await html2canvas(wrap, { scale: 2, backgroundColor: '#ffffff', useCORS: true, allowTaint: false });
       const dataURL = canvas.toDataURL('image/png');
       const fname = GRADE_CONFIG.grade + '\u6bcf\u65e5\u53cd\u9988_' + state.feedbackDate + '.png';
