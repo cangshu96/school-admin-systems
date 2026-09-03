@@ -1958,7 +1958,9 @@ async function generateFeedback() {
       });
       if (rec.remark && !/__daily__/.test(cls.id)) {
         // 班级备注：负面关键词归Improve，其余（正面/中性描述）归Keep
-        const NEG = /睡觉|趴|讲话|纪律|迟到|早退|玩手机|混乱|吵|打闹|追跑|发呆|走神|没带|未带|缺|不认真|不专注|提醒|批评|问题|不足|差|乱/i;
+        const NEG = /睡觉|趴着|趴桌|讲话|纪律差|纪律不好|迟到|早退|玩手机|混乱|吵闹|打闹|追跑|发呆|走神|没带|未带|缺|不认真|不专注|批评|问题|不足|较差|脏乱|凌乱/i;
+        const POS = /认真|良好|专注|积极|安静|有序|状态好|气氛|大声|朗读|到位|表扬|点赞|顺利/i;
+        if (NEG.test(rec.remark) && !POS.test(rec.remark)) {
         if (NEG.test(rec.remark)) {
           const k = '备注：' + rec.remark;
           if (!tagCount[k]) tagCount[k] = [];
