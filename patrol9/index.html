@@ -733,7 +733,7 @@ const ADMIN_PASSWORD = 'EQjwc';
 const PATROL_GROUPS = ['语文', '数学', '英语', '道法', '历史', '综合组'];
 
 // ===== 学年配置（构建脚本按年级替换此块）=====
-const GRADE_CONFIG = {"grade": "九年级", "dir": "patrol9", "subtitle": "武汉市二桥中学 · 知音九年级", "classPrefix": 9, "suffix": "_g9", "groups": ["语文", "数学", "英语", "物理", "化学", "道法", "历史", "综合组"], "depts": null};
+const GRADE_CONFIG = {"grade": "九年级", "dir": "patrol9", "subtitle": "武汉市二桥中学 · 知音九年级", "classPrefix": 9, "suffix": "_g9", "groups": ["语文", "数学", "英语", "物理", "化学", "道法", "历史", "综合组"], "patrolPlan": {"1": "数学组", "2": "英语组", "3": "语文组", "4": "历史组（上午）德法组（下午）", "5": "化学组 物理组"}, "depts": null};
 // 表名辅助：八年级表带 _g8 后缀，九年级带 _g9 后缀，七年级无后缀
 function TB(name) { return name + GRADE_CONFIG.suffix; }
 // 级部范围标签，如 一级部（701-707）
@@ -1040,7 +1040,8 @@ function initLoginDept() {
     GRADE_CONFIG.depts.map(d => '<option value="' + d.name + '">' + deptRangeLabel(d) + '</option>').join('');
 }
 function renderPatrolPlan() {
-  const PLAN = { 1: '数学', 2: '历史', 3: '语文', 4: '道法', 5: '英语' };
+  const DEFAULT_PLAN = { 1: '数学', 2: '历史', 3: '语文', 4: '道法', 5: '英语' };
+  const PLAN = GRADE_CONFIG.patrolPlan || DEFAULT_PLAN;
   const NAMES = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五' };
   const today = todayWd();
   let h = '<div class="plan-title">📚 本周巡课学科安排</div>';
@@ -1810,6 +1811,15 @@ async function renderSummary() {
       html += '</tr>';
     });
     html += '</tbody></table>';
+    // 其他备注（巡课老师当天填写的整体备注）
+    const dailyRec = state.records['__daily__' + '_0'];
+    if (dailyRec && dailyRec.remark) {
+      const noteInspectors = dailyRec.inspector || '';
+      html += '<div style="margin-top:12px;padding:10px 12px;background:#fffbe6;border:1px solid #f5e6a8;border-radius:8px;font-size:13px;line-height:1.7">' +
+        '<b style="color:#b8860b">📝 当天其他备注</b>' +
+        (noteInspectors ? '<span style="color:var(--text2);font-size:12px;margin-left:6px">记录人：' + escapeAttr(noteInspectors) + '</span>' : '') +
+        '<div style="margin-top:4px;white-space:pre-wrap">' + escapeAttr(dailyRec.remark) + '</div></div>';
+    }
     container.innerHTML = html;
   } catch (err) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red)">加载失败：' + err.message + '</div>';
