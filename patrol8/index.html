@@ -594,7 +594,7 @@ body { font-size: 16px; line-height: 1.5; }
     </div>
     <div class="feedback-section">
       <h3>👤 记录人</h3>
-      <input type="text" id="recorder" placeholder="如：李媛">
+      <input type="text" id="recorder" placeholder="如记录人：某某某">
     </div>
     <div class="feedback-actions">
       <button class="btn btn-primary btn-sm" onclick="generateFeedback()">自动生成</button>
@@ -1937,8 +1937,11 @@ async function generateFeedback() {
     state.periods.forEach(p => {
       const rec = state.records[cls.id + '_' + p.period];
       if (!rec) return;
-      if (rec.scores && rec.scores['_banzhuren']) duty = true;
       if (rec.special) { allA = false; return; }
+      // 体育类课次不计入自动生成文本（大体育课/室外体育课）
+      const sched = getSchedule(cls.id, p.period);
+      if (sched && sched.subject === '体育') return;
+      if (rec.scores && rec.scores['_banzhuren']) duty = true;
       SCORE_ITEMS.forEach(item => {
         const g = rec.scores[item] || 'A';
         if (g !== 'A') {
