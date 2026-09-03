@@ -12,7 +12,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>八年级巡课汇总反馈系统 v3.0.0</title>
+<title>八年级巡课汇总反馈系统 v4.0.0</title>
 <style>
 :root {
   --primary: #1677ff;
@@ -271,6 +271,13 @@ body {
 .summary-table .class-col { font-weight: 600; background: #fafafa; }
 .cell-a { color: var(--green); font-weight: 600; }
 .cell-auto { color: #9cb8a4; background: #f7faf8; font-weight: 400; cursor: default; }
+.kiss-doc { font-family: "宋体", SimSun, serif; color: #000; }
+.kiss-doc .k-head { text-align: center; font-size: 28px; font-weight: bold; color: #1F4E79; letter-spacing: 6px; }
+.kiss-doc .k-sub { text-align: center; font-size: 10px; color: #C0392B; margin: 3px 0 26px 0; letter-spacing: 1px; }
+.kiss-doc .k-meta { font-size: 15px; margin: 8px 0; }
+.kiss-doc .k-sec { font-size: 15px; font-weight: bold; margin: 18px 0 5px 0; }
+.kiss-doc .k-item { font-size: 15px; margin-left: 16px; line-height: 1.9; text-align: justify; }
+.kiss-doc .k-sign { font-size: 15px; margin-top: 36px; }
 .cell-b { color: var(--orange); font-weight: 600; }
 .cell-c { color: var(--red); font-weight: 600; }
 .cell-special { color: var(--purple); font-size: 11px; }
@@ -452,7 +459,7 @@ body { font-size: 16px; line-height: 1.5; }
 <div id="loginScreen">
   <div class="login-card">
     <h1>📋 八年级巡课汇总反馈系统</h1>
-    <div class="version">v3.0.0</div>
+    <div class="version">v4.0.0</div>
     <div class="subtitle">武汉市二桥中学 · 知音八年级</div>
     <div class="form-group" id="loginDeptGroup">
       <label>级部</label>
@@ -495,7 +502,7 @@ body { font-size: 16px; line-height: 1.5; }
 <!-- ===== Main App ===== -->
 <div id="mainApp" class="screen-hidden">
   <div class="app-header">
-    <h1>📋 八年级巡课汇总 <span class="ver">v3.0.0</span></h1>
+    <h1>📋 八年级巡课汇总 <span class="ver">v4.0.0</span></h1>
     <div class="header-info">
       <div class="user" id="headerUser"></div>
       <div class="date" id="headerDate"></div>
@@ -570,21 +577,29 @@ body { font-size: 16px; line-height: 1.5; }
       <input type="date" id="feedbackDate" onchange="renderFeedback()">
     </div>
     <div class="feedback-section">
-      <h3>✅ 好的方面</h3>
-      <textarea id="goodPoints" placeholder="总结表现好的班级和具体做法..."></textarea>
+      <h3>✅ 需要保留的 Keep</h3>
+      <textarea id="keepPoints" placeholder="自动生成后可修改：表现好的班级、值得发扬的做法..."></textarea>
     </div>
     <div class="feedback-section">
-      <h3>⚠️ 不足之处</h3>
-      <textarea id="issues" placeholder="指明存在问题的班级和具体情况..."></textarea>
+      <h3>⚠️ 需要改进的 Improve</h3>
+      <textarea id="improvePoints" placeholder="自动生成后可修改：按现象归类的问题..."></textarea>
     </div>
     <div class="feedback-section">
-      <h3>📝 巡堂总结</h3>
-      <textarea id="summaryText" placeholder="总体评价和建议..."></textarea>
+      <h3>▶️ 需要开始的 Start</h3>
+      <textarea id="startPoints" placeholder="默认延续上一份反馈，可修改：新的工作要求..."></textarea>
+    </div>
+    <div class="feedback-section">
+      <h3>⏹️ 需要停止的 Stop</h3>
+      <textarea id="stopPoints" placeholder="默认延续上一份反馈，可修改：需要纠正的行为..."></textarea>
+    </div>
+    <div class="feedback-section">
+      <h3>👤 记录人</h3>
+      <input type="text" id="recorder" placeholder="如：李媛">
     </div>
     <div class="feedback-actions">
       <button class="btn btn-primary btn-sm" onclick="generateFeedback()">自动生成</button>
       <button class="btn btn-outline btn-sm" onclick="saveFeedback()">保存反馈</button>
-      <button class="btn btn-outline btn-sm" onclick="exportFeedback()">导出CSV</button>
+      <button class="btn btn-outline btn-sm" onclick="exportFeedbackImage()">📷 导出图片</button>
       <button class="btn btn-primary btn-sm" onclick="exportFeedbackWord()">导出Word</button>
     </div>
   </div>
@@ -1897,70 +1912,109 @@ async function renderFeedback() {
   try {
     await loadPatrolRecords(state.feedbackDate);
     const { data } = await sb.from(TB('patrol_summary')).select('*').eq('date', state.feedbackDate).maybeSingle();
-    document.getElementById('goodPoints').value = (data && data.good_points) || '';
-    document.getElementById('issues').value = (data && data.issues) || '';
-    document.getElementById('summaryText').value = (data && data.summary_text) || '';
+    document.getElementById('keepPoints').value = (data && data.keep_points) || '';
+    document.getElementById('improvePoints').value = (data && data.improve_points) || '';
+    document.getElementById('startPoints').value = (data && data.start_points) || '';
+    document.getElementById('stopPoints').value = (data && data.stop_points) || '';
+    document.getElementById('recorder').value = (data && data.recorder) || localStorage.getItem('last_recorder') || '';
   } catch (err) {
     showToast('加载失败：' + err.message, 'error');
   }
 }
 
-function generateFeedback() {
+async function generateFeedback() {
   const date = state.feedbackDate;
-  const weekday = getWeekday(date);
-  let goodArr = [];
-  let issueArr = [];
-  let totalChecked = 0, totalB = 0, totalC = 0, totalSpecial = 0;
-
-  visibleClasses().forEach(cls => {
-    let classHasB = false, classHasC = false, classAllA = true, classSpecial = '';
-    let classIssues = [];
+  const clsList = visibleClasses();
+  // ---- Keep：亮点推导 ----
+  const keepArr = [];
+  const allAClasses = [], dutyCount = { n: 0 };
+  const posNotes = [];
+  const tagCount = {};   // 负面标签聚类: tag -> [班级]
+  const bcPeriods = {};  // B/C 出现的节次label
+  clsList.forEach(cls => {
+    let allA = true; let duty = false;
     state.periods.forEach(p => {
-      const key = cls.id + '_' + p.period;
-      const rec = state.records[key];
+      const rec = state.records[cls.id + '_' + p.period];
       if (!rec) return;
-      totalChecked++;
-      if (rec.special) { totalSpecial++; classSpecial = rec.special; classAllA = false; return; }
+      if (rec.scores && rec.scores['_banzhuren']) duty = true;
+      if (rec.special) { allA = false; return; }
       SCORE_ITEMS.forEach(item => {
         const g = rec.scores[item] || 'A';
-        if (g === 'B') { totalB++; classHasB = true; classAllA = false; classIssues.push(p.label + item + '为B' + (rec.reasons[item] ? '：' + rec.reasons[item] : '')); }
-        if (g === 'C') { totalC++; classHasC = true; classAllA = false; classIssues.push(p.label + item + '为C' + (rec.reasons[item] ? '：' + rec.reasons[item] : '')); }
+        if (g !== 'A') {
+          allA = false;
+          const reason = rec.reasons && rec.reasons[item];
+          if (reason) {
+            if (!tagCount[reason]) tagCount[reason] = [];
+            tagCount[reason].push(cls.name);
+          } else {
+            const k = item + '为' + g;
+            if (!tagCount[k]) tagCount[k] = [];
+            tagCount[k].push(cls.name);
+          }
+          if (!bcPeriods[p.label]) bcPeriods[p.label] = 0;
+          bcPeriods[p.label]++;
+        }
       });
-      if (rec.remark) classIssues.push(p.label + '备注：' + rec.remark);
+      if (rec.remark && !/__daily__/.test(cls.id)) {
+        // 班级备注进入 Improve 素材
+        const k = '备注：' + rec.remark;
+        if (!tagCount[k]) tagCount[k] = [];
+        tagCount[k].push(cls.name);
+      }
     });
-    if (classAllA && !classSpecial) {
-      goodArr.push(cls.name + '全时段各项均为A');
-    }
-    if (classSpecial) {
-      issueArr.push(cls.name + '：' + (classSpecial === '开会' ? '开年级大会' : '学生自习'));
-    }
-    if (classIssues.length > 0) {
-      issueArr.push(cls.name + '：' + classIssues.join('；'));
+    if (allA) allAClasses.push(cls.name);
+    if (duty) dutyCount.n++;
+  });
+  const dailyRec = state.records['__daily__' + '_0'];
+  if (dailyRec && dailyRec.remark) posNotes.push(dailyRec.remark);
+  if (allAClasses.length === clsList.length && clsList.length > 0) {
+    keepArr.push('全天各班巡课各项均为A，课堂秩序整体良好');
+  } else if (allAClasses.length > 0) {
+    keepArr.push(allAClasses.join('、') + ' 班全时段各项均为A，课堂状态好，值得表扬');
+  }
+  if (dutyCount.n > 0) keepArr.push(dutyCount.n + ' 个班次出现班主任坐班，班务管理到位');
+  posNotes.forEach(n => keepArr.push(n));
+  // ---- Improve：标签聚类（只报现象+涉及班级） ----
+  const improveArr = [];
+  Object.keys(tagCount).sort((a, b) => tagCount[b].length - tagCount[a].length).forEach(tag => {
+    const clsNames = Array.from(new Set(tagCount[tag])).sort();
+    if (tag.startsWith('备注：')) {
+      improveArr.push(tag.replace('备注：', '') + '（' + clsNames.join('、') + '）');
+    } else if (clsNames.length >= 3) {
+      improveArr.push('部分班级出现' + tag + '现象（' + clsNames.join('、') + '），老师们要关注');
+    } else if (clsNames.length > 0) {
+      improveArr.push(clsNames.join('、') + ' ' + tag + '，需要提醒改进');
     }
   });
-
-  let good = goodArr.length > 0 ? goodArr.join('\n') : '暂无';
-  let issues = issueArr.length > 0 ? issueArr.join('\n') : '暂无';
-  let summary = formatDateCN(date) + '（周' + weekday + '）巡堂情况：\n';
-  summary += '共巡课' + totalChecked + '班次，其中A等级为主，B等级' + totalB + '项，C等级' + totalC + '项，特殊情况' + totalSpecial + '班次。\n';
-  if (totalB + totalC > 0) {
-    summary += '需关注存在B/C等级的班级，建议跟进整改。';
-  } else {
-    summary += '整体情况良好。';
-  }
-
-  document.getElementById('goodPoints').value = good;
-  document.getElementById('issues').value = issues;
-  document.getElementById('summaryText').value = summary;
-  showToast('已自动生成反馈内容，请检查并修改', 'success');
+  // ---- Start/Stop：延续上一份（今天往前找最近一份非空反馈） ----
+  let lastStart = '', lastStop = '';
+  try {
+    const { data: recent } = await sb.from(TB('patrol_summary')).select('date,start_points,stop_points').lt('date', date).order('date', { ascending: false }).limit(10);
+    if (recent) {
+      for (const row of recent) {
+        if (row.start_points && !lastStart) lastStart = row.start_points;
+        if (row.stop_points && !lastStop) lastStop = row.stop_points;
+        if (lastStart && lastStop) break;
+      }
+    }
+  } catch (e) {}
+  document.getElementById('keepPoints').value = keepArr.map((s, i) => (i + 1) + '.' + s).join('\n') || '1.全天巡课情况整体正常';
+  document.getElementById('improvePoints').value = improveArr.map((s, i) => (i + 1) + '.' + s).join('\n') || '1.暂无需改进事项，继续保持';
+  document.getElementById('startPoints').value = lastStart || '';
+  document.getElementById('stopPoints').value = lastStop || '';
+  showToast('已自动生成，Keep/Improve来自巡课数据，Start/Stop延续上次，请检查修改', 'success');
 }
 
 async function saveFeedback() {
+  const recorder = document.getElementById('recorder').value.trim();
+  if (recorder) localStorage.setItem('last_recorder', recorder);
   const data = {
     date: state.feedbackDate,
-    good_points: document.getElementById('goodPoints').value,
-    issues: document.getElementById('issues').value,
-    summary_text: document.getElementById('summaryText').value,
+    keep_points: document.getElementById('keepPoints').value,
+    improve_points: document.getElementById('improvePoints').value,
+    start_points: document.getElementById('startPoints').value,
+    stop_points: document.getElementById('stopPoints').value,
+    recorder: recorder,
     inspector: state.teacher,
     updated_at: new Date().toISOString()
   };
@@ -1974,59 +2028,114 @@ async function saveFeedback() {
 }
 
 
+// KISS反馈排版DOM（图片与Word共用结构源）
+function buildFeedbackDoc() {
+  const date = state.feedbackDate;
+  const weekday = getWeekday(date);
+  const secs = [
+    ['需要保留的 Keep：', 'keepPoints'],
+    ['需要改进的 Improve：', 'improvePoints'],
+    ['需要开始的 Start：', 'startPoints'],
+    ['需要停止的 Stop：', 'stopPoints'],
+  ];
+  const gradeNum = GRADE_CONFIG.grade.replace('年级', '');
+  const parts = [];
+  parts.push('<div class="k-head">\u6b66\u6c49\u5e02\u4e8c\u6865\u4e2d\u5b66</div>');
+  parts.push('<div class="k-sub">WUHAN ERQIAO JUNIOR MIDDLE SCHOOL · \u8fde\u63a5\u66f4\u5927\u7684\u4e16\u754c</div>');
+  parts.push('<div class="k-meta">\u5e74\u7ea7\uff1a' + gradeNum + '\u5e74\u7ea7</div>');
+  parts.push('<div class="k-meta">\u65f6\u95f4\uff1a' + date + '\uff08\u5468' + weekday + '\uff09</div>');
+  secs.forEach(([title, id]) => {
+    const val = (document.getElementById(id) ? document.getElementById(id).value : '').trim();
+    const lines = val ? val.split('\n').map(s => s.trim()).filter(s => s) : [];
+    parts.push('<div class="k-sec">' + title + '</div>');
+    if (lines.length === 0) {
+      parts.push('<div class="k-item">1.\u65e0</div>');
+    } else {
+      lines.forEach((line, i) => {
+        parts.push('<div class="k-item">' + (i + 1) + '.' + line.replace(/^\d+\./, '') + '</div>');
+      });
+    }
+  });
+  const rec = document.getElementById('recorder') ? document.getElementById('recorder').value.trim() : '';
+  parts.push('<div class="k-sign">\u8bb0\u5f55\u4eba\uff1a' + (rec || state.teacher || '') + '</div>');
+  return parts.join('');
+}
+
+async function exportFeedbackImage() {
+  const btn = event && event.target;
+  if (btn) { btn.disabled = true; btn.textContent = '\u751f\u6210\u4e2d...'; }
+  try {
+    await loadLib('html2canvas').catch(e => showToast(e.message, 'error'));
+    const wrap = document.createElement('div');
+    wrap.className = 'kiss-doc';
+    wrap.innerHTML = buildFeedbackDoc();
+    wrap.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;padding:48px 56px;width:760px;box-sizing:border-box;';
+    document.body.appendChild(wrap);
+    try {
+      const canvas = await html2canvas(wrap, { scale: 2, backgroundColor: '#ffffff' });
+      const dataURL = canvas.toDataURL('image/png');
+      const fname = GRADE_CONFIG.grade + '\u6bcf\u65e5\u53cd\u9988_' + state.feedbackDate + '.png';
+      const isMobile = /Android|iPhone|iPad|iPod|Mobile|HarmonyOS/i.test(navigator.userAgent) || /QQ|MicroMessenger/i.test(navigator.userAgent);
+      if (isMobile) {
+        showImageOverlay(dataURL, fname);
+      } else {
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.download = fname; a.href = url; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
+      showToast('\u56fe\u7247\u5df2\u5bfc\u51fa', 'success');
+    } finally {
+      document.body.removeChild(wrap);
+    }
+  } catch (err) {
+    showToast('\u5bfc\u51fa\u5931\u8d25\uff1a' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '\ud83d\udcf7 \u5bfc\u51fa\u56fe\u7247'; }
+  }
+}
+
 function exportFeedbackWord() {
   const date = state.feedbackDate;
   const weekday = getWeekday(date);
+  const gradeNum = GRADE_CONFIG.grade.replace('年级', '');
   let html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">';
-  html += '<head><meta charset="utf-8"><title>巡堂反馈</title><style>';
-  html += 'body { font-family: "宋体", SimSun, serif; font-size: 14pt; line-height: 1.8; }';
-  html += 'h1 { text-align: center; font-size: 18pt; margin-bottom: 4pt; }';
-  html += 'h2 { font-size: 14pt; margin-top: 16pt; border-bottom: 1px solid #000; padding-bottom: 4pt; }';
-  html += '.subtitle { text-align: center; color: #666; font-size: 12pt; margin-bottom: 16pt; }';
-  html += 'table { width: 100%; border-collapse: collapse; font-size: 11pt; margin: 8pt 0; }';
-  html += 'th, td { border: 1px solid #000; padding: 4pt 6pt; text-align: center; }';
-  html += 'th { background: #e6f4ff; }';
-  html += '.section { margin-top: 12pt; }';
-  html += '.good { color: #52c41a; }';
-  html += '.bad { color: #ff4d4f; }';
+  html += '<head><meta charset="utf-8"><title>每日反馈</title><style>';
+  html += 'body { font-family: "宋体", SimSun, serif; font-size: 12pt; line-height: 2.0; color: #000; margin: 40pt 56pt; }';
+  html += '.k-head { text-align: center; font-size: 22pt; font-weight: bold; color: #1F4E79; letter-spacing: 4pt; }';
+  html += '.k-sub { text-align: center; font-size: 8pt; color: #C0392B; margin: 2pt 0 24pt 0; letter-spacing: 1pt; }';
+  html += '.k-meta { font-size: 12pt; margin: 6pt 0; }';
+  html += '.k-sec { font-size: 12pt; font-weight: bold; margin-top: 16pt; margin-bottom: 4pt; }';
+  html += '.k-item { font-size: 12pt; margin-left: 12pt; text-align: justify; }';
+  html += '.k-sign { font-size: 12pt; margin-top: 32pt; }';
   html += '</style></head><body>';
-  html += '<h1>武汉市二桥中学巡堂反馈</h1>';
-  html += '<div class="subtitle">' + date + '（周' + weekday + '） · 巡课人：' + (state.teacher || '') + '</div>';
-  
-  // Summary table
-  html += '<h2>巡课汇总表</h2><table><thead><tr><th>班级</th>';
-  state.periods.forEach(p => { html += '<th>' + p.label + '</th>'; });
-  html += '<th>巡课人</th></tr></thead><tbody>';
-  visibleClasses().forEach(cls => {
-    html += '<tr><td>' + cls.name + '</td>';
-    const inspectors = new Set();
-    state.periods.forEach(p => {
-      const rec = state.records[cls.id + '_' + p.period];
-      if (!rec) { html += '<td>-</td>'; return; }
-      if (rec.inspector) inspectors.add(rec.inspector);
-      if (rec.special) { html += '<td>' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) + '</td>'; return; }
-      const grades = SCORE_ITEMS.map(item => { const g = rec.scores[item] || 'A'; return g; }).join('/');
-      html += '<td>' + grades + '</td>';
-    });
-    html += '<td style="font-size:10pt">' + (inspectors.size > 0 ? Array.from(inspectors).join('、') : '-') + '</td></tr>';
+  const secs = [
+    ['需要保留的 Keep：', 'keepPoints'],
+    ['需要改进的 Improve：', 'improvePoints'],
+    ['需要开始的 Start：', 'startPoints'],
+    ['需要停止的 Stop：', 'stopPoints'],
+  ];
+  html += '<div class="k-head">武汉市二桥中学</div>';
+  html += '<div class="k-sub">WUHAN ERQIAO JUNIOR MIDDLE SCHOOL · 连接更大的世界</div>';
+  html += '<div class="k-meta">年级：' + gradeNum + '年级</div>';
+  html += '<div class="k-meta">时间：' + date + '（周' + weekday + '）</div>';
+  secs.forEach(([title, id]) => {
+    const val = (document.getElementById(id) ? document.getElementById(id).value : '').trim();
+    const lines = val ? val.split('\n').map(s => s.trim()).filter(s => s) : [];
+    html += '<div class="k-sec">' + title + '</div>';
+    if (!lines.length) { html += '<div class="k-item">1.无</div>'; }
+    else lines.forEach((line, i) => { html += '<div class="k-item">' + (i + 1) + '.' + line.replace(/^\d+\./, '') + '</div>'; });
   });
-  html += '</tbody></table>';
-  
-  // Good points
-  html += '<div class="section"><h2>好的方面</h2><p style="white-space:pre-wrap">' + (document.getElementById('goodPoints').value || '暂无') + '</p></div>';
-  // Issues
-  html += '<div class="section"><h2>不足之处</h2><p style="white-space:pre-wrap">' + (document.getElementById('issues').value || '暂无') + '</p></div>';
-  // Summary
-  html += '<div class="section"><h2>巡堂总结</h2><p style="white-space:pre-wrap">' + (document.getElementById('summaryText').value || '暂无') + '</p></div>';
-  html += '<div style="text-align:right;margin-top:24pt">巡课人：' + (state.teacher || '') + '</div>';
-  html += '<div style="text-align:right;color:#999;font-size:11pt">生成时间：' + new Date().toLocaleString() + '</div>';
+  const rec = document.getElementById('recorder') ? document.getElementById('recorder').value.trim() : '';
+  html += '<div class="k-sign">记录人：' + (rec || state.teacher || '') + '</div>';
   html += '</body></html>';
-  
   const blob = new Blob(['\ufeff' + html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = '巡堂反馈_' + date + '.doc';
-  a.click();
+  a.download = GRADE_CONFIG.grade + '每日反馈_' + date + '.doc';
+  a.href = url; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 function exportFeedback() {
