@@ -1040,7 +1040,8 @@ function initLoginDept() {
     GRADE_CONFIG.depts.map(d => '<option value="' + d.name + '">' + deptRangeLabel(d) + '</option>').join('');
 }
 function renderPatrolPlan() {
-  const PLAN = { 1: '数学', 2: '历史', 3: '语文', 4: '道法', 5: '英语' };
+  const DEFAULT_PLAN = { 1: '数学', 2: '历史', 3: '语文', 4: '道法', 5: '英语' };
+  const PLAN = GRADE_CONFIG.patrolPlan || DEFAULT_PLAN;
   const NAMES = { 1: '周一', 2: '周二', 3: '周三', 4: '周四', 5: '周五' };
   const today = todayWd();
   let h = '<div class="plan-title">📚 本周巡课学科安排</div>';
@@ -1810,6 +1811,15 @@ async function renderSummary() {
       html += '</tr>';
     });
     html += '</tbody></table>';
+    // 其他备注（巡课老师当天填写的整体备注）
+    const dailyRec = state.records['__daily__' + '_0'];
+    if (dailyRec && dailyRec.remark) {
+      const noteInspectors = dailyRec.inspector || '';
+      html += '<div style="margin-top:12px;padding:10px 12px;background:#fffbe6;border:1px solid #f5e6a8;border-radius:8px;font-size:13px;line-height:1.7">' +
+        '<b style="color:#b8860b">📝 当天其他备注</b>' +
+        (noteInspectors ? '<span style="color:var(--text2);font-size:12px;margin-left:6px">记录人：' + escapeAttr(noteInspectors) + '</span>' : '') +
+        '<div style="margin-top:4px;white-space:pre-wrap">' + escapeAttr(dailyRec.remark) + '</div></div>';
+    }
     container.innerHTML = html;
   } catch (err) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red)">加载失败：' + err.message + '</div>';
