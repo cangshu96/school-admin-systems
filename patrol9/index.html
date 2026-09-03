@@ -270,6 +270,7 @@ body {
 .summary-table th { background: var(--primary-light); color: var(--primary-dark); font-weight: 500; }
 .summary-table .class-col { font-weight: 600; background: #fafafa; }
 .cell-a { color: var(--green); font-weight: 600; }
+.cell-auto { color: #9cb8a4; background: #f7faf8; font-weight: 400; cursor: default; }
 .cell-b { color: var(--orange); font-weight: 600; }
 .cell-c { color: var(--red); font-weight: 600; }
 .cell-special { color: var(--purple); font-size: 11px; }
@@ -1709,6 +1710,14 @@ async function exportSummaryImage() {
     btn.textContent = orig;
   }
 }
+function periodEnded(p, dateStr) {
+  const today = todayStr();
+  if (dateStr < today) return true;
+  if (dateStr > today) return false;
+  const now = new Date();
+  const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  return hhmm > p.end_time;
+}
 async function renderSummary() {
   state.summaryDate = document.getElementById('summaryDate').value || todayStr();
   const container = document.getElementById('summaryGrid');
@@ -1728,7 +1737,7 @@ async function renderSummary() {
       dcls.forEach(cls => {
         state.periods.forEach(p => {
           const key = cls.id + '_' + p.period;
-          const rec = state.records[key];
+          const rec = state.records[key] || (periodEnded(p, state.summaryDate) ? { scores: {}, special: null } : null);
           if (rec) {
             totalChecked++;
             if (rec.special) { special++; return; }
@@ -1772,7 +1781,7 @@ async function renderSummary() {
     statsEl.innerHTML = statsHtml;
 
     // Render grid
-    let html = '<div style="font-size:12px;color:var(--text2);margin-bottom:6px">💬 有备注 · 📷 有照片 · 👨\u200d🏫 班主任坐班 · 点击单元格查看详情</div><table class="summary-table"><thead><tr><th>班级</th>';
+    let html = '<div style="font-size:12px;color:var(--text2);margin-bottom:6px">💬 有备注 · 📷 有照片 · 👨\u200d🏫 班主任坐班 · 灰色A默=课后未打分自动默认 · 点击单元格查看详情</div><table class="summary-table"><thead><tr><th>班级</th>';
     // Add period columns
     state.periods.forEach(p => {
       html += '<th>' + p.label + '<br><span style="font-size:10px;font-weight:400">' + p.start_time + '</span></th>';
@@ -1783,10 +1792,14 @@ async function renderSummary() {
       html += '<tr><td class="class-col">' + (state.role === 'admin' ? '<span class="dept-badge">' + deptOfClass(cls.name) + '</span>' : '') + cls.name + '</td>';
       state.periods.forEach(p => {
         const key = cls.id + '_' + p.period;
-        const rec = state.records[key];
+        let rec = state.records[key];
+        let isAuto = false;
+        if (!rec && periodEnded(p, state.summaryDate)) { rec = { scores: {}, special: null }; isAuto = true; }
         const duty = rec && rec.scores && rec.scores['_banzhuren'] ? ' 👨\u200d🏫' : '';
         if (!rec) {
           html += '<td class="cell-none">-</td>';
+        } else if (isAuto) {
+          html += '<td class="cell-auto" title="课后未打分，系统默认全A">' + SCORE_ITEMS.map(() => '<span>A</span>').join(' ') + ' <span style="font-size:10px">默</span></td>';
         } else if (rec.special) {
           html += '<td class="cell-special">' + (SPECIAL_DISPLAY[rec.special] ? SPECIAL_DISPLAY[rec.special].short : rec.special) + duty + '</td>';
         } else {
