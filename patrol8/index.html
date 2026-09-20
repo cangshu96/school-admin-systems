@@ -638,11 +638,13 @@ body { font-size: 16px; line-height: 1.5; }
       <button class="settings-subtab" onclick="switchSettingsTab('teachers')">教师管理</button>
       <button class="settings-subtab" onclick="switchSettingsTab('schedule')">课表配置</button>
       <button class="settings-subtab" onclick="switchSettingsTab('periods')">节次时间</button>
+      <button class="settings-subtab" onclick="switchSettingsTab('calendar')">调休设置</button>
     </div>
     <div id="settingsClasses"></div>
     <div id="settingsTeachers" class="screen-hidden"></div>
     <div id="settingsSchedule" class="screen-hidden"></div>
     <div id="settingsPeriods" class="screen-hidden"></div>
+    <div id="settingsCalendar" class="screen-hidden"></div>
   </div>
 
   <!-- Issues Tab -->
@@ -840,6 +842,7 @@ const state = {
   photos: {},
   currentPeriod: 1,
   scheduleWeekday: 0,  // 0=跟随今天; 1-5=教务处课表界面选中星期
+  calendar: {},  // 调休映射 { 'YYYY-MM-DD': 星期1-5 }
   viewDate: todayStr(),
   role: null,
   teacher: null,
@@ -936,10 +939,17 @@ async function loadSchedule() {
     });
   }
 }
+async function loadCalendar() {
+  try {
+    const { data, error } = await sb.from(TB('patrol_calendar')).select('*');
+    state.calendar = {};
+    if (!error && data) data.forEach(r => { state.calendar[r.date] = r.weekday; });
+  } catch (e) { state.calendar = {}; }
+}
 async function loadData() {
   showLoading('加载数据...');
   try {
-    await Promise.all([loadClasses(), loadTeachers(), loadPeriods(), loadSchedule()]);
+    await Promise.all([loadClasses(), loadTeachers(), loadPeriods(), loadSchedule(), loadCalendar()]);
     hideLoading();
   } catch (err) {
     hideLoading();
@@ -1020,6 +1030,8 @@ function getPeriodInfo(period) {
 }
 
 function todayWd() {
+  const t = state.calendar && state.calendar[todayStr()];
+  if (t >= 1 && t <= 5) return t;
   const d = new Date().getDay();
   return (d >= 1 && d <= 5) ? d : 1;
 }
@@ -2302,16 +2314,74 @@ function exportSummary() {
 // ============================================
 function switchSettingsTab(tab) {
   state.currentSettingsTab = tab;
+  const labelMap = { classes: '班级', teachers: '教师', schedule: '课表', periods: '节次', calendar: '调休' };
   document.querySelectorAll('.settings-subtab').forEach(btn => {
-    btn.classList.toggle('active', btn.textContent.includes(tab === 'classes' ? '班级' : tab === 'teachers' ? '教师' : tab === 'schedule' ? '课表' : '节次'));
+    btn.classList.toggle('active', btn.textContent.includes(labelMap[tab] || ''));
   });
-  ['Classes','Teachers','Schedule','Periods'].forEach(t => {
+  ['Classes','Teachers','Schedule','Periods','Calendar'].forEach(t => {
     document.getElementById('settings' + t).classList.toggle('screen-hidden', t.toLowerCase() !== tab);
   });
   if (tab === 'classes') renderClassSettings();
   if (tab === 'teachers') renderTeacherSettings();
   if (tab === 'schedule') renderScheduleSettings();
   if (tab === 'periods') renderPeriodSettings();
+  if (tab === 'calendar') renderCalendarSettings();
+}
+
+// --- 调休设置 ---
+function renderCalendarSettings() {
+  const c = document.getElementById('settingsCalendar');
+  const wdn = ['', '周一', '周二', '周三', '周四', '周五'];
+  let html = '<div class="settings-card"><div class="card-title">📅 调休课表设置</div>';
+  html += '<div class="add-row">';
+  html += '<input type="date" id="calDate" style="width:140px">';
+  html += '<select id="calWeekday" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px">';
+  for (let i = 1; i <= 5; i++) html += '<option value="' + i + '">' + wdn[i] + '</option>';
+  html += '</select>';
+  html += '<button class="btn btn-primary btn-sm" onclick="addCalendar()">添加调休</button>';
+  html += '</div>';
+  html += '<div class="muted" style="font-size:12px;margin:6px 0 10px">用于假期调休/补课。例：周日调休上周二的课，选“今天日期+周二”，当天巡课与课表即按周二显示。</div>';
+  html += '<div id="calendarList"></div></div>';
+  c.innerHTML = html;
+  renderCalendarList();
+}
+async function renderCalendarList() {
+  const box = document.getElementById('calendarList');
+  if (!box) return;
+  let list = [];
+  try {
+    const { data, error } = await sb.from(TB('patrol_calendar')).select('*').order('date');
+    if (!error && data) list = data;
+  } catch (e) {}
+  const wdn = ['', '周一', '周二', '周三', '周四', '周五'];
+  state.calendar = {};
+  list.forEach(r => { state.calendar[r.date] = r.weekday; });
+  if (list.length === 0) { box.innerHTML = '<div class="muted">暂无调休设置，当日按正常星期显示课表。</div>'; return; }
+  box.innerHTML = list.map(r => {
+    const isToday = r.date === todayStr();
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border)">'
+      + '<span>' + r.date + (isToday ? ' <b style="color:#c0392b">（今天）</b>' : '') + ' → ' + wdn[r.weekday] + '</span>'
+      + '<button class="btn btn-outline btn-sm" onclick="deleteCalendar(\'' + r.date + '\')">删除</button></div>';
+  }).join('');
+}
+async function addCalendar() {
+  const date = document.getElementById('calDate').value;
+  const weekday = parseInt(document.getElementById('calWeekday').value, 10);
+  if (!date || !weekday) { showToast('请选择日期和星期', 'error'); return; }
+  try {
+    const { error } = await sb.from(TB('patrol_calendar')).upsert({ date, weekday }, { onConflict: 'date' });
+    if (error) throw error;
+    await renderCalendarList();
+    showToast('调休设置已保存，当天课表将按对应星期显示', 'success');
+  } catch (err) { showToast('保存失败：' + err.message, 'error'); }
+}
+async function deleteCalendar(date) {
+  try {
+    const { error } = await sb.from(TB('patrol_calendar')).delete().eq('date', date);
+    if (error) throw error;
+    await renderCalendarList();
+    showToast('已删除该调休设置', 'success');
+  } catch (err) { showToast('删除失败：' + err.message, 'error'); }
 }
 
 // --- 班级管理 ---
