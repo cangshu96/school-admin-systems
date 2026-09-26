@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教学管理数据驾驶舱</title>
+<script src="https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js"></script>
+<script src="https://cangshu96.github.io/school-admin-systems/vendor/echarts.min.js"></script>
+<style>
+:root{--pri:#2B579A;--accent:#1F3864;--bg:#f4f6fb;--card:#fff;--bd:#e3e8f0;--text:#333;--muted:#8a94a6;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);}
+header{background:linear-gradient(135deg,var(--pri),var(--accent));color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+header h1{font-size:20px;font-weight:600;}
+header .sub{font-size:12px;opacity:.85;margin-top:2px;}
+.grade-switch{display:flex;gap:6px;}
+.grade-switch button{border:none;padding:7px 18px;border-radius:6px;background:rgba(255,255,255,.18);color:#fff;cursor:pointer;font-size:14px;}
+.grade-switch button.active{background:#fff;color:var(--pri);font-weight:600;}
+.filters{background:var(--card);padding:10px 24px;border-bottom:1px solid var(--bd);display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+.filters label{font-size:13px;color:var(--muted);}
+.filters input[type=date]{border:1px solid var(--bd);border-radius:6px;padding:5px 8px;font-size:13px;}
+.filters select{border:1px solid var(--bd);border-radius:6px;padding:5px 8px;font-size:13px;}
+.chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{border:1px solid var(--bd);background:#fff;border-radius:16px;padding:4px 12px;font-size:12px;cursor:pointer;color:#555;}
+.chip.active{background:var(--pri);color:#fff;border-color:var(--pri);}
+.btn{border:none;border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;}
+.btn-plain{background:#f0f2f7;color:#555;}
+.container{padding:16px 24px;}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;}
+.kpi{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px 16px;}
+.kpi .v{font-size:26px;font-weight:700;color:var(--pri);}
+.kpi .l{font-size:12px;color:var(--muted);margin-top:2px;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid .full{grid-column:1 / -1;}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px 16px;}
+.card h3{font-size:14px;color:var(--accent);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+.card h3 .hint{font-size:11px;color:var(--muted);font-weight:normal;}
+.chart{width:100%;}
+.msg{text-align:center;color:var(--muted);padding:40px 0;font-size:14px;}
+.loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:99;align-items:center;justify-content:center;font-size:16px;color:var(--pri);}
+.loading.show{display:flex;}
+.modal-mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:90;align-items:center;justify-content:center;padding:20px;}
+.modal-mask.show{display:flex;}
+.modal{background:#fff;border-radius:10px;max-width:720px;width:100%;max-height:80vh;overflow:auto;padding:18px 20px;}
+.modal h3{margin-bottom:12px;color:var(--accent);}
+.modal table{width:100%;border-collapse:collapse;font-size:13px;}
+.modal th,.modal td{border:1px solid var(--bd);padding:6px 8px;text-align:center;}
+.modal th{background:#f0f3f9;}
+.modal .x{float:right;cursor:pointer;color:var(--muted);font-size:16px;}
+@media(max-width:900px){.grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="loading" id="loading"><span>数据加载中…</span></div>
+<header>
+  <div>
+    <h1>教学管理数据驾驶舱</h1>
+    <div class="sub">巡课数据 · 可视化 / 互动化 / 智能化</div>
+  </div>
+  <div class="grade-switch" id="gradeSwitch">
+    <button data-suffix="" class="active">七年级</button>
+    <button data-suffix="_g8">八年级</button>
+    <button data-suffix="_g9">九年级</button>
+  </div>
+</header>
+<div class="filters" id="filterBar">
+  <label>起 <input type="date" id="dateFrom"></label>
+  <label>止 <input type="date" id="dateTo"></label>
+  <label>星期
+    <span class="chips" id="wdChips">
+      <span class="chip" data-wd="1">一</span><span class="chip" data-wd="2">二</span><span class="chip" data-wd="3">三</span><span class="chip" data-wd="4">四</span><span class="chip" data-wd="5">五</span>
+    </span>
+  </label>
+  <label>班级 <select id="classSel"><option value="">全部班级</option></select></label>
+  <button class="btn btn-plain" id="resetBtn">重置</button>
+</div>
+<div class="container">
+  <div class="kpi-row" id="kpiRow"></div>
+  <div class="grid">
+    <div class="card full"><h3>班级巡课热力矩阵 <span class="hint" id="heatHint"></span></h3><div class="chart" id="heatChart" style="height:430px"></div></div>
+    <div class="card"><h3>三维评分分布</h3><div class="chart" id="scoreChart" style="height:280px"></div></div>
+    <div class="card"><h3>巡课趋势</h3><div class="chart" id="trendChart" style="height:280px"></div></div>
+    <div class="card"><h3>班主任坐班排行</h3><div class="chart" id="zuobanChart" style="height:280px"></div></div>
+    <div class="card"><h3>学科巡课对比</h3><div class="chart" id="subjectChart" style="height:280px"></div></div>
+    <div class="card full"><h3 id="alertTitle">⚠️ 预警消息中心 <span class="hint">自动规则监测</span></h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <h4 style="font-size:13px;color:#c0392b;margin:0 0 6px">规则预警</h4>
+          <div id="alertList"></div>
+        </div>
+        <div>
+          <h4 style="font-size:13px;color:var(--accent);margin:0 0 6px">问题整改台账</h4>
+          <div id="issueList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-mask" id="detailMask">
+  <div class="modal">
+    <h3><span id="detailTitle"></span><span class="x" onclick="closeDetail()">✕</span></h3>
+    <div id="detailBody"></div>
+  </div>
+</div>
+<script>
+const EMBEDDED_CONFIG = {
+  supabaseUrl: 'https://vigzdhhrqjmbtwewgcrz.supabase.co',
+  supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ3pkaGhycWptYnR3ZXdnY3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDI2NjksImV4cCI6MjEwMjcxODY2OX0.JNw_f2j776kVcVBLbtmScXMs_KU5ZOeyockBIFbT8oU'
+};
+const DIMS = ['学习状态', '教室环境', '课堂纪律'];
+const WDN = ['日', '一', '二', '三', '四', '五', '六'];
+let sb = null;
+let state = {
+  grade: '', classes: [], records: [], periods: [], schedule: [], teachers: [], summary: [], issues: [],
+  filters: { dateFrom: '', dateTo: '', weekdays: [], classId: '' },
+  clsMap: {}, perMap: {}, subjMap: {}
+};
+function todayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function wdOf(dateStr) { return new Date(dateStr + 'T00:00:00').getDay(); }
+function clsName(id) { return state.clsMap[id] || id; }
+function periodLabel(p) { return state.perMap[p] || ('第' + p + '节'); }
+function scOf(r, dim) { return (r.scores || {})[dim] || null; }
+function hasScore(r) { return DIMS.some(d => scOf(r, d)); }
+function gradeVal(r) { for (const d of ['课堂纪律', '学习状态', '教室环境']) { const v = scOf(r, d); if (v) return v; } return null; }
+
+async function fetchAll(table) {
+  const out = []; let off = 0; const step = 1000;
+  while (true) {
+    const { data, error } = await sb.from(table).select('*').limit(step).offset(off).order('date', { ascending: true });
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < step) break;
+    off += step;
+  }
+  return out;
+}
+
+function filteredRecords() {
+  const f = state.filters;
+  return state.records.filter(r => {
+    if (f.classId && r.class_id !== f.classId) return false;
+    if (f.dateFrom && r.date < f.dateFrom) return false;
+    if (f.dateTo && r.date > f.dateTo) return false;
+    if (f.weekdays.length && !f.weekdays.includes(wdOf(r.date))) return false;
+    return true;
+  });
+}
+function heatDates() {
+  const f = state.filters;
+  let dates = [...new Set(state.records.map(r => r.date))].sort();
+  if (f.dateFrom) dates = dates.filter(d => d >= f.dateFrom);
+  if (f.dateTo) dates = dates.filter(d => d <= f.dateTo);
+  return dates.slice(-10);
+}
+
+async function loadGrade(suffix) {
+  showLoading(true);
+  try {
+    const [classes, records, periods, schedule, teachers, summary, issues] = await Promise.all([
+      fetchAll('patrol_classes' + suffix), fetchAll('patrol_records' + suffix), fetchAll('patrol_periods' + suffix),
+      fetchAll('patrol_schedule' + suffix), fetchAll('patrol_teachers' + suffix), fetchAll('patrol_summary' + suffix), fetchAll('patrol_issues' + suffix)
+    ]);
+    state.grade = suffix;
+    state.classes = classes.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    state.records = records; state.periods = periods; state.schedule = schedule;
+    state.teachers = teachers; state.summary = summary; state.issues = issues;
+    state.clsMap = {}; state.perMap = {}; state.subjMap = {};
+    state.classes.forEach(c => state.clsMap[c.id] = c.name);
+    state.periods.forEach(p => state.perMap[p.period] = p.label || ('第' + p.period + '节'));
+    schedule.forEach(s => state.subjMap[s.class_id + '_' + s.weekday + '_' + s.period] = s.subject);
+    fillClassSel();
+    render();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('kpiRow').innerHTML = '<div class="msg">数据加载失败：' + e.message + '</div>';
+  } finally { showLoading(false); }
+}
+function fillClassSel() {
+  const sel = document.getElementById('classSel');
+  sel.innerHTML = '<option value="">全部班级</option>' + state.classes.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+}
+function showLoading(v) { document.getElementById('loading').classList.toggle('show', v); }
+
+// ---------- KPI ----------
+function renderKPI() {
+  const f = filteredRecords();
+  const all = state.records;
+  const scored = f.filter(hasScore).length;
+  const bzr = f.filter(r => (r.scores || {})._banzhuren).length;
+  const issues = state.issues.filter(i => {
+    if (f === all) return true;
+    return (!state.filters.dateFrom || i.date >= state.filters.dateFrom) && (!state.filters.dateTo || i.date <= state.filters.dateTo);
+  }).length;
+  const classIds = state.filters.classId ? [state.filters.classId] : state.classes.map(c => c.id);
+  const fullAClasses = state.classes.filter(c => {
+    if (state.filters.classId && c.id !== state.filters.classId) return false;
+    const rs = f.filter(r => r.class_id === c.id && hasScore(r));
+    return rs.length > 0 && rs.every(r => DIMS.every(d => scOf(r, d) === 'A'));
+  }).length;
+  const days = new Set(f.map(r => r.date)).size;
+  const cards = [
+    { v: f.length, l: '范围巡课数' }, { v: all.length, l: '累计巡课数' }, { v: scored, l: '已评分节次' },
+    { v: bzr, l: '班主任坐班' }, { v: issues, l: '范围问题数' }, { v: fullAClasses, l: '全A班级数' }, { v: days, l: '巡课天数' }
+  ];
+  document.getElementById('kpiRow').innerHTML = cards.map(c => '<div class="kpi"><div class="v">' + c.v + '</div><div class="l">' + c.l + '</div></div>').join('');
+}
+
+// ---------- 热力矩阵（班级 × 日期）----------
+function renderHeat() {
+  const el = document.getElementById('heatChart');
+  if (!window.echarts) return;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const days = heatDates();
+  const xData = days.map(s => s + ' 周' + WDN[wdOf(s)]);
+  const yData = state.classes.map(c => c.name);
+  const grp = {}, hasRec = {};
+  state.records.forEach(r => {
+    if (state.filters.classId && r.class_id !== state.filters.classId) return;
+    if (state.filters.weekdays.length && !state.filters.weekdays.includes(wdOf(r.date))) return;
+    hasRec[r.class_id + '_' + r.date] = true;
+    const g = gradeVal(r); if (g) grp[r.class_id + '_' + r.date] = g;
+  });
+  const data = [];
+  state.classes.forEach((c, yi) => days.forEach((dt, xi) => {
+    const k = c.id + '_' + dt, g = grp[k];
+    let v = 0;
+    if (g === 'A') v = 3; else if (g === 'B') v = 2; else if (g === 'C') v = 1;
+    else if (hasRec[k]) v = 0.5;
+    data.push([xi, yi, v, c.id, dt]);
+  }));
+  document.getElementById('heatHint').textContent = days.length ? (days[0] + ' ~ ' + days[days.length - 1]) : '暂无数据';
+  chart.setOption({
+    tooltip: { formatter: p => yData[p.value[1]] + ' · ' + xData[p.value[0]] + '<br>' + labelOf(p.value[2]) + '<br><span style=color:#888>点击查看明细</span>' },
+    grid: { left: 60, right: 20, top: 10, bottom: 30 },
+    xAxis: { type: 'category', data: xData, axisLabel: { rotate: 45, fontSize: 10 }, splitArea: { show: true } },
+    yAxis: { type: 'category', data: yData, splitArea: { show: true } },
+    visualMap: { min: 0, max: 3, calculable: false, orient: 'horizontal', left: 'center', bottom: 0,
+      pieces: [{ value: 0, label: '未巡', color: '#eef0f4' }, { value: 0.5, label: '巡', color: '#a9c4e8' }, { value: 1, label: 'C', color: '#e74c3c' }, { value: 2, label: 'B', color: '#ffc107' }, { value: 3, label: 'A', color: '#4caf50' }] },
+    series: [{ type: 'heatmap', data,
+      label: { show: true, fontSize: 9, formatter: p => { const m = { 3: 'A', 2: 'B', 1: 'C', 0.5: '巡', 0: '' }; return m[p.value[2]] || ''; } },
+      itemStyle: { borderWidth: 1, borderColor: '#fff' },
+      emphasis: { itemStyle: { shadowBlur: 6, shadowColor: 'rgba(0,0,0,.3)' } } }]
+  }, true);
+  chart.off('click');
+  chart.on('click', p => { if (p.value[4]) showDetail(p.value[3], p.value[4]); });
+}
+function labelOf(v) { if (v === 3) return '课堂纪律：A'; if (v === 2) return '课堂纪律：B'; if (v === 1) return '课堂纪律：C'; if (v === 0.5) return '已巡课（无评分）'; return '未巡课'; }
+
+// ---------- 三维评分分布 ----------
+function renderScore() {
+  const el = document.getElementById('scoreChart');
+  if (!window.echarts) return;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const f = filteredRecords();
+  const counts = DIMS.map(() => ({ A: 0, B: 0, C: 0 }));
+  f.forEach(r => DIMS.forEach((d, i) => { const v = scOf(r, d); if (v in counts[i]) counts[i][v]++; }));
+  chart.setOption({
+    tooltip: { trigger: 'axis' }, legend: { bottom: 0 },
+    grid: { left: 40, right: 16, top: 10, bottom: 40 },
+    xAxis: { type: 'category', data: DIMS }, yAxis: { type: 'value', minInterval: 1 },
+    series: [
+      { name: 'A', type: 'bar', stack: 't', data: counts.map(c => c.A), itemStyle: { color: '#4caf50' } },
+      { name: 'B', type: 'bar', stack: 't', data: counts.map(c => c.B), itemStyle: { color: '#ffc107' } },
+      { name: 'C', type: 'bar', stack: 't', data: counts.map(c => c.C), itemStyle: { color: '#e74c3c' } }
+    ]
+  });
+}
+
+// ---------- 巡课趋势 ----------
+function renderTrend() {
+  const el = document.getElementById('trendChart');
+  if (!window.echarts) return;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const f = filteredRecords();
+  const byDate = {};
+  f.forEach(r => byDate[r.date] = (byDate[r.date] || 0) + 1);
+  const dates = Object.keys(byDate).sort();
+  chart.setOption({
+    tooltip: { trigger: 'axis' }, grid: { left: 40, right: 16, top: 20, bottom: 30 },
+    xAxis: { type: 'category', data: dates, axisLabel: { rotate: 45, fontSize: 10 } }, yAxis: { type: 'value', minInterval: 1 },
+    series: [{ name: '巡课记录数', type: 'line', smooth: true, data: dates.map(d => byDate[d]), itemStyle: { color: '#2B579A' }, areaStyle: { color: 'rgba(43,87,154,.12)' } }]
+  });
+}
+
+// ---------- 班主任坐班排行 ----------
+function renderZuoban() {
+  const el = document.getElementById('zuobanChart');
+  if (!window.echarts) return;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const f = filteredRecords();
+  const cnt = {};
+  state.classes.forEach(c => cnt[c.id] = 0);
+  f.forEach(r => { if ((r.scores || {})._banzhuren) cnt[r.class_id]++; });
+  const yData = state.classes.map(c => c.name);
+  const data = state.classes.map(c => cnt[c.id] || 0);
+  chart.setOption({
+    tooltip: { trigger: 'axis' }, grid: { left: 50, right: 30, top: 10, bottom: 20 },
+    xAxis: { type: 'value', minInterval: 1 }, yAxis: { type: 'category', data: yData, axisLabel: { fontSize: 11 } },
+    series: [{ type: 'bar', data, itemStyle: { color: '#2B579A' }, label: { show: true, position: 'right', fontSize: 10 } }]
+  });
+}
+
+// ---------- 学科巡课对比 ----------
+function renderSubject() {
+  const el = document.getElementById('subjectChart');
+  if (!window.echarts) return;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const f = filteredRecords();
+  const cnt = {};
+  f.forEach(r => {
+    const wd = wdOf(r.date);
+    const subj = state.subjMap[r.class_id + '_' + wd + '_' + r.period];
+    if (subj) cnt[subj] = (cnt[subj] || 0) + 1;
+  });
+  const entries = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
+  chart.setOption({
+    tooltip: { trigger: 'axis' }, grid: { left: 70, right: 30, top: 10, bottom: 20 },
+    xAxis: { type: 'value', minInterval: 1 }, yAxis: { type: 'category', data: entries.map(e => e[0]), axisLabel: { fontSize: 11 } },
+    series: [{ type: 'bar', data: entries.map(e => e[1]), itemStyle: { color: '#E67E22' }, label: { show: true, position: 'right', fontSize: 10 } }]
+  });
+}
+
+// ---------- 下钻明细 ----------
+function showDetail(classId, date) {
+  const rs = state.records.filter(r => r.class_id === classId && r.date === date)
+    .sort((a, b) => a.period - b.period);
+  document.getElementById('detailTitle').textContent = clsName(classId) + ' · ' + date + ' 巡课明细';
+  if (!rs.length) { document.getElementById('detailBody').innerHTML = '<div class="msg">该日无巡课记录</div>'; }
+  else {
+    const rows = rs.map(r => '<tr><td>' + periodLabel(r.period) + '</td><td>' + (r.inspector || '') + '</td><td>' +
+      DIMS.map(d => scOf(r, d) || '-').join(' / ') + '</td><td>' + ((r.scores || {})._banzhuren ? '是' : '') + '</td><td>' + (r.remark || '') + '</td></tr>').join('');
+    document.getElementById('detailBody').innerHTML = '<table><tr><th>节次</th><th>巡课老师</th><th>学习/环境/纪律</th><th>坐班</th><th>备注</th></tr>' + rows + '</table>';
+  }
+  document.getElementById('detailMask').classList.add('show');
+}
+function closeDetail() { document.getElementById('detailMask').classList.remove('show'); }
+
+// ---------- 规则预警与台账 ----------
+function computeAlerts() {
+  const alerts = [];
+  const today = todayStr();
+  const wk = new Date(today + 'T00:00:00'); wk.setDate(wk.getDate() - 7);
+  const wStr = wk.toISOString().slice(0, 10);
+  state.classes.forEach(c => {
+    const rs = state.records.filter(r => r.class_id === c.id);
+    if (!rs.length) { alerts.push({ cls: c.name, type: '未巡课', msg: '至今无任何巡课记录' }); return; }
+    const last = rs.map(r => r.date).sort().pop();
+    const gap = Math.round((new Date(today + 'T00:00:00') - new Date(last + 'T00:00:00')) / 86400000);
+    if (gap >= 3) alerts.push({ cls: c.name, type: '连续未巡课', msg: '最近巡课 ' + last + '，已 ' + gap + ' 天未巡课' });
+    const cs = state.records.filter(r => r.class_id === c.id && r.date >= wStr && scOf(r, '课堂纪律') === 'C').length;
+    if (cs >= 2) alerts.push({ cls: c.name, type: '纪律C增多', msg: '近7天课堂纪律 C 等 ' + cs + ' 次' });
+    const last3 = rs.filter(r => r.date >= wStr && (r.scores || {})._banzhuren).length;
+    const prev = rs.filter(r => r.date < wStr && (r.scores || {})._banzhuren).length;
+    if (last3 === 0 && prev > 0) alerts.push({ cls: c.name, type: '坐班骤降', msg: '近7天无班主任坐班记录' });
+  });
+  state.issues.forEach(i => {
+    const st = (i.status || '').toLowerCase();
+    if (['done', '已完成', '已解决', '已闭环'].includes(st)) return;
+    const gap = Math.round((new Date(today + 'T00:00:00') - new Date(i.date + 'T00:00:00')) / 86400000);
+    if (gap >= 2) alerts.push({ cls: clsName(i.class_id), type: '问题超期', msg: '问题已 ' + gap + ' 天未闭环' });
+  });
+  return alerts;
+}
+function renderAlerts() {
+  const alerts = computeAlerts();
+  const list = document.getElementById('alertList');
+  document.getElementById('alertTitle').innerHTML = (alerts.length ? '⚠️ 预警消息中心 (' + alerts.length + ')' : '✅ 预警消息中心') + ' <span class="hint">自动规则监测</span>';
+  if (!alerts.length) { list.innerHTML = '<div class="msg" style="padding:16px 0">暂无预警，一切正常</div>'; return; }
+  list.innerHTML = alerts.map(a => '<div style="padding:8px 10px;border:1px solid #f5c6c6;background:#fef7f7;border-radius:6px;margin-bottom:8px">'
+    + '<div style="font-size:13px;font-weight:600;color:#c0392b">' + a.cls + ' · ' + a.type + '</div>'
+    + '<div style="font-size:12px;color:#666;margin-top:2px">' + a.msg + '</div></div>').join('');
+}
+function renderIssues() {
+  const list = document.getElementById('issueList');
+  if (!state.issues.length) { list.innerHTML = '<div class="msg" style="padding:16px 0">暂无问题记录</div>'; return; }
+  const stBadge = s => {
+    s = s || ''; const done = ['done', '已完成', '已解决', '已闭环'].includes(s);
+    return '<span style="font-size:11px;padding:1px 8px;border-radius:10px;color:#fff;background:' + (done ? '#27ae60' : '#e67e22') + '">' + (s || '未处理') + '</span>';
+  };
+  list.innerHTML = state.issues.map(i => '<div style="padding:8px 10px;border:1px solid var(--bd);border-radius:6px;margin-bottom:8px">'
+    + '<div style="font-size:12px;color:#888">' + (i.date || '') + ' · ' + clsName(i.class_id) + '　' + stBadge(i.status) + '</div>'
+    + '<div style="font-size:13px;margin-top:3px">' + (i.content || '') + '</div></div>').join('');
+}
+
+// ---------- 联动渲染 ----------
+function render() { renderKPI(); renderHeat(); renderScore(); renderTrend(); renderZuoban(); renderSubject(); renderAlerts(); renderIssues(); }
+
+// ---------- 筛选事件 ----------
+document.getElementById('wdChips').addEventListener('click', e => {
+  const chip = e.target.closest('.chip'); if (!chip) return;
+  const wd = parseInt(chip.dataset.wd, 10);
+  const wds = state.filters.weekdays;
+  const i = wds.indexOf(wd); i >= 0 ? wds.splice(i, 1) : wds.push(wd);
+  chip.classList.toggle('active', wds.includes(wd));
+  render();
+});
+document.getElementById('classSel').addEventListener('change', e => { state.filters.classId = e.target.value; render(); });
+document.getElementById('dateFrom').addEventListener('change', e => { state.filters.dateFrom = e.target.value; render(); });
+document.getElementById('dateTo').addEventListener('change', e => { state.filters.dateTo = e.target.value; render(); });
+document.getElementById('resetBtn').addEventListener('click', () => {
+  state.filters = { dateFrom: '', dateTo: '', weekdays: [], classId: '' };
+  document.getElementById('dateFrom').value = ''; document.getElementById('dateTo').value = '';
+  document.getElementById('classSel').value = '';
+  document.querySelectorAll('#wdChips .chip').forEach(c => c.classList.remove('active'));
+  render();
+});
+document.getElementById('gradeSwitch').addEventListener('click', e => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  document.querySelectorAll('#gradeSwitch button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  resetFilters();
+  loadGrade(btn.dataset.suffix);
+});
+function resetFilters() {
+  state.filters = { dateFrom: '', dateTo: '', weekdays: [], classId: '' };
+  document.getElementById('dateFrom').value = ''; document.getElementById('dateTo').value = '';
+  document.querySelectorAll('#wdChips .chip').forEach(c => c.classList.remove('active'));
+}
+window.addEventListener('resize', () => {
+  ['heatChart', 'scoreChart', 'trendChart', 'zuobanChart', 'subjectChart'].forEach(id => { const c = echarts.getInstanceByDom(document.getElementById(id)); if (c) c.resize(); });
+});
+(async function init() {
+  sb = supabase.createClient(EMBEDDED_CONFIG.supabaseUrl, EMBEDDED_CONFIG.supabaseKey);
+  await loadGrade('');
+})();
+</script>
+</body>
+</html>
