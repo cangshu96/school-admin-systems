@@ -123,10 +123,12 @@ function scOf(r, dim) { return (r.scores || {})[dim] || null; }
 function hasScore(r) { return DIMS.some(d => scOf(r, d)); }
 function gradeVal(r) { for (const d of ['课堂纪律', '学习状态', '教室环境']) { const v = scOf(r, d); if (v) return v; } return null; }
 
-async function fetchAll(table) {
+async function fetchAll(table, orderField) {
   const out = []; let off = 0; const step = 1000;
   while (true) {
-    const { data, error } = await sb.from(table).select('*').limit(step).offset(off).order('date', { ascending: true });
+    let q = sb.from(table).select('*');
+    if (orderField) q = q.order(orderField, { ascending: true });
+    const { data, error } = await q.range(off, off + step - 1);
     if (error) throw error;
     out.push(...data);
     if (data.length < step) break;
@@ -157,7 +159,7 @@ async function loadGrade(suffix) {
   showLoading(true);
   try {
     const [classes, records, periods, schedule, teachers, summary, issues] = await Promise.all([
-      fetchAll('patrol_classes' + suffix), fetchAll('patrol_records' + suffix), fetchAll('patrol_periods' + suffix),
+      fetchAll('patrol_classes' + suffix), fetchAll('patrol_records' + suffix, 'date'), fetchAll('patrol_periods' + suffix),
       fetchAll('patrol_schedule' + suffix), fetchAll('patrol_teachers' + suffix), fetchAll('patrol_summary' + suffix), fetchAll('patrol_issues' + suffix)
     ]);
     state.grade = suffix;
