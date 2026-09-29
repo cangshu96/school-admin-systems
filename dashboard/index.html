@@ -85,6 +85,7 @@ header .sub{font-size:12px;opacity:.85;margin-top:2px;}
     <button data-suffix="" class="active">七年级</button>
     <button data-suffix="_g8">八年级</button>
     <button data-suffix="_g9">九年级</button>
+    <button data-mode="overview">总览</button>
   </div>
 </header>
 <div class="filters" id="filterBar">
@@ -100,7 +101,7 @@ header .sub{font-size:12px;opacity:.85;margin-top:2px;}
 </div>
 <div class="container">
   <div class="kpi-row" id="kpiRow"></div>
-  <div class="grid">
+  <div class="grid" id="singleGrade">
     <div class="card full"><h3>班级巡课热力矩阵 <span class="hint" id="heatHint"></span></h3><div class="chart" id="heatChart" style="height:430px"></div></div>
     <div class="card"><h3>三维评分分布</h3><div class="chart" id="scoreChart" style="height:280px"></div></div>
     <div class="card"><h3>巡课趋势</h3><div class="chart" id="trendChart" style="height:280px"></div></div>
@@ -113,10 +114,24 @@ header .sub{font-size:12px;opacity:.85;margin-top:2px;}
           <div id="alertList"></div>
         </div>
         <div>
-          <h4 style="font-size:13px;color:var(--accent);margin:0 0 6px">问题整改台账</h4>
+          <h4 style="font-size:13px;color:var(--accent);margin:0 0 6px">问题整改台账 <button class="btn btn-plain" style="font-size:11px;padding:2px 8px;float:right" onclick="openIssueForm()">＋ 登记</button></h4>
+          <div id="issueBoard" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
           <div id="issueList"></div>
         </div>
       </div>
+    </div>
+    <div class="card"><h3>教师巡课工作量 <span class="hint">按巡课老师统计</span></h3><div class="chart" id="teacherChart" style="height:280px"></div></div>
+    <div class="card"><h3>备注文本洞察 <span class="hint">巡课备注主题归类</span></h3><div class="chart" id="remarkChart" style="height:280px"></div></div>
+    <div class="card"><h3>巡课环比趋势 <span class="hint">周 / 月环比</span></h3><div class="chart" id="compareChart" style="height:280px"></div></div>
+    <div class="card"><h3>节次覆盖分析 <span class="hint">低覆盖节次提示</span></h3><div class="chart" id="periodChart" style="height:280px"></div></div>
+  </div>
+  <div id="overviewPanel" style="display:none">
+    <div class="kpi-row" id="ovKpiRow"></div>
+    <div class="grid">
+      <div class="card"><h3>三年级巡课总量对比</h3><div class="chart" id="ovTotalChart" style="height:280px"></div></div>
+      <div class="card"><h3>三年级评分分布对比</h3><div class="chart" id="ovScoreChart" style="height:280px"></div></div>
+      <div class="card"><h3>三年级坐班对比</h3><div class="chart" id="ovDutyChart" style="height:280px"></div></div>
+      <div class="card"><h3>三年级巡课覆盖对比</h3><div class="chart" id="ovClassChart" style="height:280px"></div></div>
     </div>
   </div>
 </div>
@@ -124,6 +139,23 @@ header .sub{font-size:12px;opacity:.85;margin-top:2px;}
   <div class="modal">
     <h3><span id="detailTitle"></span><span class="x" onclick="closeDetail()">✕</span></h3>
     <div id="detailBody"></div>
+  </div>
+</div>
+<div class="modal-mask" id="issueMask">
+  <div class="modal">
+    <h3>登记问题 <span class="x" onclick="closeIssueForm()">✕</span></h3>
+    <div style="display:grid;gap:10px;padding:6px 0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label style="font-size:13px;color:#888">日期</label><br><input type="date" id="issueDate" style="width:100%;padding:5px;border:1px solid var(--bd);border-radius:6px"></div>
+        <div><label style="font-size:13px;color:#888">班级</label><br><select id="issueClass" style="width:100%;padding:5px;border:1px solid var(--bd);border-radius:6px"></select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><label style="font-size:13px;color:#888">类别</label><br><select id="issueCategory" style="width:100%;padding:5px;border:1px solid var(--bd);border-radius:6px"><option>纪律</option><option>卫生</option><option>状态</option><option>多媒体</option><option>作业</option><option>其他</option></select></div>
+        <div><label style="font-size:13px;color:#888">提交人</label><br><input type="text" id="issueReporter" placeholder="教务处" style="width:100%;padding:5px;border:1px solid var(--bd);border-radius:6px"></div>
+      </div>
+      <div><label style="font-size:13px;color:#888">问题描述</label><br><textarea id="issueContent" rows="3" placeholder="请输入问题描述..." style="width:100%;padding:5px;border:1px solid var(--bd);border-radius:6px"></textarea></div>
+      <button class="btn" style="background:var(--pri);color:#fff;padding:8px" onclick="submitIssue()">提交问题</button>
+    </div>
   </div>
 </div>
 <script>
@@ -437,19 +469,254 @@ function renderAlerts() {
     + '<div style="font-size:12px;color:#666;margin-top:2px">' + a.msg + '</div></div>').join('');
 }
 function renderIssues() {
+  const board = document.getElementById('issueBoard');
   const list = document.getElementById('issueList');
+  if (board) {
+    const sc = { '待处理': 0, '处理中': 0, '已解决': 0, '已关闭': 0 };
+    state.issues.forEach(i => { if (sc[i.status] !== undefined) sc[i.status]++; });
+    board.innerHTML = ['待处理', '处理中', '已解决', '已关闭'].map(s =>
+      '<span style="font-size:12px;padding:3px 10px;border-radius:12px;background:#f0f2f7;color:#555">' + s + ' <b>' + (sc[s] || 0) + '</b></span>').join('');
+  }
   if (!state.issues.length) { list.innerHTML = '<div class="msg" style="padding:16px 0">暂无问题记录</div>'; return; }
-  const stBadge = s => {
-    s = s || ''; const done = ['done', '已完成', '已解决', '已闭环'].includes(s);
-    return '<span style="font-size:11px;padding:1px 8px;border-radius:10px;color:#fff;background:' + (done ? '#27ae60' : '#e67e22') + '">' + (s || '未处理') + '</span>';
-  };
-  list.innerHTML = state.issues.map(i => '<div style="padding:8px 10px;border:1px solid var(--bd);border-radius:6px;margin-bottom:8px">'
-    + '<div style="font-size:12px;color:#888">' + (i.date || '') + ' · ' + clsName(i.class_id) + '　' + stBadge(i.status) + '</div>'
-    + '<div style="font-size:13px;margin-top:3px">' + (i.content || '') + '</div></div>').join('');
+  const statusOptions = ['待处理', '处理中', '已解决', '已关闭'];
+  list.innerHTML = state.issues.map(i => {
+    const opts = statusOptions.map(s => '<option' + (i.status === s ? ' selected' : '') + '>' + s + '</option>').join('');
+    return '<div style="padding:8px 10px;border:1px solid var(--bd);border-radius:6px;margin-bottom:8px">'
+      + '<div style="font-size:12px;color:#888">' + (i.date || '') + ' · ' + clsName(i.class_id) + '　' + (i.category || '') + '</div>'
+      + '<div style="font-size:13px;margin-top:3px">' + (i.content || '') + '</div>'
+      + '<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">'
+      + '<span style="font-size:11px;color:#aaa">提交人：' + (i.reporter || '-') + '</span>'
+      + '<select style="font-size:12px;padding:2px 6px;border:1px solid var(--bd);border-radius:5px" onchange="updateIssueStatus(\'' + i.id + '\', this.value)">' + opts + '</select>'
+      + '</div></div>';
+  }).join('');
+}
+
+// ---------- B3 问题登记 / 处理 / 闭环 ----------
+function openIssueForm() {
+  const sel = document.getElementById('issueClass');
+  if (sel && !sel.options.length) {
+    sel.innerHTML = '<option value="">不指定班级</option>' + state.classes.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+  }
+  document.getElementById('issueDate').value = todayStr();
+  document.getElementById('issueReporter').value = '教务处';
+  document.getElementById('issueContent').value = '';
+  document.getElementById('issueMask').classList.add('show');
+}
+function closeIssueForm() { document.getElementById('issueMask').classList.remove('show'); }
+async function submitIssue() {
+  const date = document.getElementById('issueDate').value;
+  const class_id = document.getElementById('issueClass').value || null;
+  const category = document.getElementById('issueCategory').value;
+  const reporter = document.getElementById('issueReporter').value || '教务处';
+  const content = document.getElementById('issueContent').value.trim();
+  if (!date || !content) { alert('请填写日期和问题描述'); return; }
+  const id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
+  const { error } = await sb.from('patrol_issues' + state.grade).insert({ id, date, class_id, category, content, reporter, status: '待处理' });
+  if (error) { console.error(error); alert('提交失败：' + error.message); return; }
+  state.issues.unshift({ id, date, class_id, category, content, reporter, status: '待处理', handler: null, solution: null, resolved_at: null });
+  closeIssueForm(); renderIssues(); renderKPI();
+}
+async function updateIssueStatus(id, status) {
+  const resolved = (status === '已解决' || status === '已关闭') ? new Date().toISOString() : null;
+  const { error } = await sb.from('patrol_issues' + state.grade).update({ status: status, resolved_at: resolved }).eq('id', id);
+  if (error) { console.error(error); alert('更新失败：' + error.message); return; }
+  const it = state.issues.find(x => x.id === id);
+  if (it) { it.status = status; it.resolved_at = resolved; }
+  renderIssues(); renderKPI(); renderAlerts();
+}
+
+// ---------- B1 教师巡课工作量 ----------
+function renderTeacher() {
+  const el = document.getElementById('teacherChart');
+  if (!window.echarts || !el) return;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const f = filteredRecords();
+  const cnt = {};
+  f.forEach(r => { if (r.inspector) cnt[r.inspector] = (cnt[r.inspector] || 0) + 1; });
+  const entries = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) { chart.clear(); return; }
+  const top = entries.slice(0, 15);
+  chart.setOption({
+    tooltip: { trigger: 'axis', formatter: p => p[0].name + '：' + p[0].value + ' 次' },
+    grid: { left: 90, right: 40, top: 10, bottom: 20 },
+    xAxis: { type: 'value', minInterval: 1 },
+    yAxis: { type: 'category', data: top.map(e => e[0]), axisLabel: { fontSize: 11 } },
+    series: [{ type: 'bar', data: top.map(e => e[1]), itemStyle: { color: '#2B579A' }, label: { show: true, position: 'right', fontSize: 10 } }]
+  });
+}
+
+// ---------- B2 备注文本洞察 ----------
+function renderRemark() {
+  const el = document.getElementById('remarkChart');
+  if (!window.echarts || !el) return;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const f = filteredRecords();
+  const cats = [
+    { name: '课堂纪律', kw: ['纪律', '讲话', '吵闹', '秩序', '打闹', '纪律差'] },
+    { name: '教室卫生', kw: ['卫生', '地面', '桌椅', '清洁', '垃圾', '整洁'] },
+    { name: '学习状态', kw: ['状态', '精神', '专注', '投入', '走神', '打瞌睡', '趴桌'] },
+    { name: '课堂互动', kw: ['互动', '提问', '回答', '参与', '小组', '讨论'] },
+    { name: '多媒体设备', kw: ['多媒体', '白板', '设备', '课件', '投影', '电脑', '屏幕'] },
+    { name: '作业练习', kw: ['作业', '练习', '任务', '做题', '检测'] },
+    { name: '积极表现', kw: ['积极', '认真', '优秀', '表扬', '活跃', '好'] },
+    { name: '教师教学', kw: ['教师', '教学', '讲解', '板书', '备课', '课堂'] }
+  ];
+  const counts = cats.map(() => 0);
+  let total = 0;
+  f.forEach(r => {
+    const rm = (r.remark || '').trim();
+    if (!rm) return;
+    total++;
+    cats.forEach((c, i) => { if (c.kw.some(k => rm.includes(k))) counts[i]++; });
+  });
+  if (!total) { chart.clear(); return; }
+  const data = cats.map((c, i) => ({ name: c.name, value: counts[i] })).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+  if (!data.length) { chart.clear(); return; }
+  chart.setOption({
+    tooltip: { trigger: 'axis', formatter: p => p[0].name + '：' + p[0].value + ' 条备注' },
+    grid: { left: 90, right: 40, top: 10, bottom: 20 },
+    xAxis: { type: 'value', minInterval: 1 },
+    yAxis: { type: 'category', data: data.map(d => d.name), axisLabel: { fontSize: 11 } },
+    series: [{ type: 'bar', data: data.map(d => d.value), itemStyle: { color: '#E67E22' }, label: { show: true, position: 'right', fontSize: 10 } }]
+  });
+}
+
+// ---------- B4 巡课周/月环比 ----------
+function renderCompare() {
+  const el = document.getElementById('compareChart');
+  if (!window.echarts || !el) return;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const f = filteredRecords();
+  const byDate = {};
+  f.forEach(r => byDate[r.date] = (byDate[r.date] || 0) + 1);
+  const t = new Date(todayStr() + 'T00:00:00');
+  const day = ms => { const d = new Date(t); d.setDate(d.getDate() - ms); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+  const sum = (a, b) => { let s = 0; for (let d = a; d <= b; d++) { s += byDate[day(d)] || 0; } return s; };
+  const thisWeek = sum(6, 0), lastWeek = sum(13, 7);
+  const thisMonth = sum(29, 0), lastMonth = sum(59, 30);
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 40, right: 16, top: 20, bottom: 20 },
+    xAxis: { type: 'category', data: ['本周', '上周', '本月', '上月'] },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [{
+      type: 'bar', barMaxWidth: 42, label: { show: true, position: 'top', fontSize: 10 },
+      data: [
+        { value: thisWeek, itemStyle: { color: '#2B579A' } },
+        { value: lastWeek, itemStyle: { color: '#a7b8d8' } },
+        { value: thisMonth, itemStyle: { color: '#E67E22' } },
+        { value: lastMonth, itemStyle: { color: '#f0c894' } }
+      ]
+    }]
+  });
+}
+
+// ---------- B5 节次覆盖分析 ----------
+function renderPeriod() {
+  const el = document.getElementById('periodChart');
+  if (!window.echarts || !el) return;
+  const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+  const f = filteredRecords();
+  const actual = {};
+  f.forEach(r => actual[r.period] = (actual[r.period] || 0) + 1);
+  const planned = {};
+  state.schedule.forEach(s => planned[s.period] = (planned[s.period] || 0) + 1);
+  const periods = state.periods.map(p => p.period).sort((a, b) => a - b);
+  const yData = periods.map(p => periodLabel(p));
+  chart.setOption({
+    tooltip: { trigger: 'axis', formatter: p => p[0].name + '<br>实际巡课：' + p[0].value + ' 条<br>课表应排：' + (p[1] ? p[1].value : '-') + ' 节' },
+    legend: { bottom: 0 },
+    grid: { left: 60, right: 16, top: 20, bottom: 40 },
+    xAxis: { type: 'category', data: yData, axisLabel: { fontSize: 11 } },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [
+      { name: '实际巡课', type: 'bar', data: periods.map(p => actual[p] || 0), itemStyle: { color: '#2B579A' } },
+      { name: '课表应排', type: 'line', data: periods.map(p => planned[p] || 0), itemStyle: { color: '#E67E22' }, symbol: 'circle' }
+    ]
+  });
+}
+
+// ---------- B6 年级横向对比（总览） ----------
+let ovLoaded = null;
+function ovChart(id) { const el = document.getElementById(id); return (el && window.echarts) ? (echarts.getInstanceByDom(el) || echarts.init(el)) : null; }
+function showOverview() {
+  document.getElementById('singleGrade').style.display = 'none';
+  document.getElementById('overviewPanel').style.display = '';
+  loadOverview();
+}
+function showSingleGrade() {
+  document.getElementById('singleGrade').style.display = '';
+  document.getElementById('overviewPanel').style.display = 'none';
+}
+async function loadOverview() {
+  showLoading(true);
+  try {
+    const grades = [
+      { suffix: '', label: '七年级' },
+      { suffix: '_g8', label: '八年级' },
+      { suffix: '_g9', label: '九年级' }
+    ];
+    const loaded = [];
+    for (const g of grades) {
+      const [classes, records, periods, schedule] = await Promise.all([
+        fetchAll('patrol_classes' + g.suffix), fetchAll('patrol_records' + g.suffix, 'date'), fetchAll('patrol_periods' + g.suffix), fetchAll('patrol_schedule' + g.suffix)
+      ]);
+      loaded.push({ label: g.label, suffix: g.suffix, classes, records, periods, schedule });
+    }
+    ovLoaded = loaded;
+    renderOverview();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('ovKpiRow').innerHTML = '<div class="msg">数据加载失败：' + e.message + '</div>';
+  } finally { showLoading(false); }
+}
+function renderOverview() {
+  if (!ovLoaded || !window.echarts) return;
+  const stats = ovLoaded.map(g => {
+    const dates = [...new Set(g.records.map(r => r.date))];
+    const rated = { A: 0, B: 0, C: 0 };
+    g.records.forEach(r => { const s = (r.scores || {}); DIMS.forEach(d => { const v = s[d]; if (v === 'A') rated.A++; else if (v === 'B') rated.B++; else if (v === 'C') rated.C++; }); });
+    return { label: g.label, count: g.records.length, cls: g.classes.length, rated, bzr: g.records.filter(r => (r.scores || {})._banzhuren).length, days: dates.length };
+  });
+  const labels = ovLoaded.map(g => g.label);
+  document.getElementById('ovKpiRow').innerHTML = [
+    { v: stats.reduce((s, x) => s + x.count, 0), l: '三年级巡课总数' },
+    { v: stats.reduce((s, x) => s + x.cls, 0), l: '三年级班级数' },
+    { v: stats.reduce((s, x) => s + x.bzr, 0), l: '三年级坐班数' }
+  ].map(c => '<div class="kpi"><div class="v">' + c.v + '</div><div class="l">' + c.l + '</div></div>').join('');
+  ovChart('ovTotalChart').setOption({
+    tooltip: { trigger: 'axis' }, grid: { left: 40, right: 16, top: 20, bottom: 30 },
+    xAxis: { type: 'category', data: labels }, yAxis: { type: 'value', minInterval: 1 },
+    series: [{ type: 'bar', data: stats.map(s => s.count), itemStyle: { color: '#2B579A' }, label: { show: true, position: 'top', fontSize: 11 } }]
+  });
+  ovChart('ovScoreChart').setOption({
+    tooltip: { trigger: 'axis' }, legend: { bottom: 0 },
+    grid: { left: 40, right: 16, top: 20, bottom: 40 },
+    xAxis: { type: 'category', data: labels }, yAxis: { type: 'value', minInterval: 1 },
+    series: [
+      { name: 'A', type: 'bar', stack: 't', data: stats.map(s => s.rated.A), itemStyle: { color: '#4caf50' } },
+      { name: 'B', type: 'bar', stack: 't', data: stats.map(s => s.rated.B), itemStyle: { color: '#ffc107' } },
+      { name: 'C', type: 'bar', stack: 't', data: stats.map(s => s.rated.C), itemStyle: { color: '#e74c3c' } }
+    ]
+  });
+  ovChart('ovDutyChart').setOption({
+    tooltip: { trigger: 'axis' }, grid: { left: 40, right: 16, top: 20, bottom: 30 },
+    xAxis: { type: 'category', data: labels }, yAxis: { type: 'value', minInterval: 1 },
+    series: [{ type: 'bar', data: stats.map(s => s.bzr), itemStyle: { color: '#8e44ad' }, label: { show: true, position: 'top', fontSize: 11 } }]
+  });
+  ovChart('ovClassChart').setOption({
+    tooltip: { trigger: 'axis' }, legend: { bottom: 0 },
+    grid: { left: 40, right: 16, top: 20, bottom: 40 },
+    xAxis: { type: 'category', data: labels }, yAxis: { type: 'value', minInterval: 1 },
+    series: [
+      { name: '班级数', type: 'bar', data: stats.map(s => s.cls), itemStyle: { color: '#2980b9' }, label: { show: true, position: 'top', fontSize: 11 } },
+      { name: '巡课天数', type: 'line', data: stats.map(s => s.days), itemStyle: { color: '#e74c3c' }, symbol: 'circle' }
+    ]
+  });
 }
 
 // ---------- 联动渲染 ----------
-function render() { renderKPI(); renderHeat(); renderScore(); renderTrend(); renderZuoban(); renderSubject(); renderAlerts(); renderIssues(); }
+function render() { renderKPI(); renderHeat(); renderScore(); renderTrend(); renderZuoban(); renderSubject(); renderAlerts(); renderIssues(); renderTeacher(); renderRemark(); renderCompare(); renderPeriod(); }
 
 // ---------- 筛选事件 ----------
 document.getElementById('wdChips').addEventListener('click', e => {
@@ -474,6 +741,8 @@ document.getElementById('gradeSwitch').addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
   document.querySelectorAll('#gradeSwitch button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (btn.dataset.mode === 'overview') { showOverview(); return; }
+  showSingleGrade();
   resetFilters();
   loadGrade(btn.dataset.suffix);
 });
@@ -483,7 +752,7 @@ function resetFilters() {
   document.querySelectorAll('#wdChips .chip').forEach(c => c.classList.remove('active'));
 }
 window.addEventListener('resize', () => {
-  ['heatChart', 'scoreChart', 'trendChart', 'zuobanChart', 'subjectChart'].forEach(id => { const c = echarts.getInstanceByDom(document.getElementById(id)); if (c) c.resize(); });
+  ['heatChart', 'scoreChart', 'trendChart', 'zuobanChart', 'subjectChart', 'teacherChart', 'remarkChart', 'compareChart', 'periodChart', 'ovTotalChart', 'ovScoreChart', 'ovDutyChart', 'ovClassChart'].forEach(id => { const c = echarts.getInstanceByDom(document.getElementById(id)); if (c) c.resize(); });
 });
 (async function init() {
   try {
