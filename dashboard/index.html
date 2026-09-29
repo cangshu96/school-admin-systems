@@ -122,6 +122,20 @@ function periodLabel(p) { return state.perMap[p] || ('第' + p + '节'); }
 function scOf(r, dim) { return (r.scores || {})[dim] || null; }
 function hasScore(r) { return DIMS.some(d => scOf(r, d)); }
 function gradeVal(r) { for (const d of ['课堂纪律', '学习状态', '教室环境']) { const v = scOf(r, d); if (v) return v; } return null; }
+function periodEnded(period, dateStr) {
+  const today = todayStr();
+  if (dateStr < today) return true;
+  if (dateStr > today) return false;
+  const now = new Date();
+  const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  return hhmm > (period.end_time || '');
+}
+function gradeOf(classId, date, period, dim) {
+  const rec = state.recMap[classId + '_' + date + '_' + period];
+  if (rec) return (rec.scores || {})[dim] || 'A';
+  if (periodEnded(period, date)) return 'A';
+  return null;
+}
 
 async function fetchAll(table, orderField) {
   const out = []; let off = 0; const step = 1000;
@@ -170,6 +184,9 @@ async function loadGrade(suffix) {
     state.classes.forEach(c => state.clsMap[c.id] = c.name);
     state.periods.forEach(p => state.perMap[p.period] = p.label || ('第' + p.period + '节'));
     schedule.forEach(s => state.subjMap[s.class_id + '_' + s.weekday + '_' + s.period] = s.subject);
+    state.recMap = {};
+    state.records.forEach(r => { state.recMap[r.class_id + '_' + r.date + '_' + r.period] = r; });
+    state.dates = [...new Set(state.records.map(r => r.date))].sort();
     fillClassSel();
     render();
   } catch (e) {
@@ -187,66 +204,82 @@ function showLoading(v) { document.getElementById('loading').classList.toggle('s
 function renderKPI() {
   const f = filteredRecords();
   const all = state.records;
-  const scored = f.filter(hasScore).length;
-  const bzr = f.filter(r => (r.scores || {})._banzhuren).length;
-  const issues = state.issues.filter(i => {
-    if (f === all) return true;
-    return (!state.filters.dateFrom || i.date >= state.filters.dateFrom) && (!state.filters.dateTo || i.date <= state.filters.dateTo);
-  }).length;
+  const dates = [...new Set(f.map(r => r.date))].sort();
   const classIds = state.filters.classId ? [state.filters.classId] : state.classes.map(c => c.id);
-  const fullAClasses = state.classes.filter(c => {
+  let rated = 0;
+  classIds.forEach(cid => dates.forEach(dt => state.periods.forEach(p => { if (gradeOf(cid, dt, p.period, '课堂纪律')) rated++; })));
+  const fullA = state.classes.filter(c => {
     if (state.filters.classId && c.id !== state.filters.classId) return false;
-    const rs = f.filter(r => r.class_id === c.id && hasScore(r));
-    return rs.length > 0 && rs.every(r => DIMS.every(d => scOf(r, d) === 'A'));
+    let hasAny = false, isFullA = true;
+    dates.forEach(dt => state.periods.forEach(p => DIMS.forEach(dim => {
+      const g = gradeOf(c.id, dt, p.period, dim);
+      if (g) { hasAny = true; if (g !== 'A') isFullA = false; }
+    })));
+    return hasAny && isFullA;
   }).length;
-  const days = new Set(f.map(r => r.date)).size;
+  const bzr = f.filter(r => (r.scores || {})._banzhuren).length;
+  const issues = state.issues.filter(i => (!state.filters.dateFrom || i.date >= state.filters.dateFrom) && (!state.filters.dateTo || i.date <= state.filters.dateTo)).length;
   const cards = [
-    { v: f.length, l: '范围巡课数' }, { v: all.length, l: '累计巡课数' }, { v: scored, l: '已评分节次' },
-    { v: bzr, l: '班主任坐班' }, { v: issues, l: '范围问题数' }, { v: fullAClasses, l: '全A班级数' }, { v: days, l: '巡课天数' }
+    { v: f.length, l: '范围巡课数' }, { v: all.length, l: '累计巡课数' }, { v: rated, l: '已评定节次(含默认A)' },
+    { v: bzr, l: '班主任坐班' }, { v: issues, l: '范围问题数' }, { v: fullA, l: '全A班级数' }, { v: dates.length, l: '巡课天数' }
   ];
   document.getElementById('kpiRow').innerHTML = cards.map(c => '<div class="kpi"><div class="v">' + c.v + '</div><div class="l">' + c.l + '</div></div>').join('');
 }
 
-// ---------- 热力矩阵（班级 × 日期）----------
+// ---------- 热力矩阵（班级 × 日期，含默认A）----------
+function heatVal(cid, dt) {
+  if (!state.periods.some(p => periodEnded(p, dt))) return 0;
+  let real = null;
+  for (const r of state.records) {
+    if (r.class_id === cid && r.date === dt && scOf(r, '课堂纪律')) { real = scOf(r, '课堂纪律'); }
+  }
+  if (real === 'A') return 3;
+  if (real === 'B') return 2;
+  if (real === 'C') return 1;
+  return 4;
+}
+function heatLabel(v) {
+  if (v === 3) return '课堂纪律：真实A';
+  if (v === 2) return '课堂纪律：B';
+  if (v === 1) return '课堂纪律：C';
+  if (v === 4) return '课后未打分 · 系统默认全A';
+  return '该日无已结束节次';
+}
 function renderHeat() {
   const el = document.getElementById('heatChart');
   if (!window.echarts) return;
   const chart = echarts.getInstanceByDom(el) || echarts.init(el);
   const days = heatDates();
   const xData = days.map(s => s + ' 周' + WDN[wdOf(s)]);
-  const yData = state.classes.map(c => c.name);
-  const grp = {}, hasRec = {};
-  state.records.forEach(r => {
-    if (state.filters.classId && r.class_id !== state.filters.classId) return;
-    if (state.filters.weekdays.length && !state.filters.weekdays.includes(wdOf(r.date))) return;
-    hasRec[r.class_id + '_' + r.date] = true;
-    const g = gradeVal(r); if (g) grp[r.class_id + '_' + r.date] = g;
-  });
+  const shown = state.filters.classId ? state.classes.filter(c => c.id === state.filters.classId) : state.classes;
+  const yData = shown.map(c => c.name);
   const data = [];
-  state.classes.forEach((c, yi) => days.forEach((dt, xi) => {
-    const k = c.id + '_' + dt, g = grp[k];
-    let v = 0;
-    if (g === 'A') v = 3; else if (g === 'B') v = 2; else if (g === 'C') v = 1;
-    else if (hasRec[k]) v = 0.5;
+  shown.forEach((c, yi) => days.forEach((dt, xi) => {
+    const v = heatVal(c.id, dt);
     data.push([xi, yi, v, c.id, dt]);
   }));
-  document.getElementById('heatHint').textContent = days.length ? (days[0] + ' ~ ' + days[days.length - 1]) : '暂无数据';
+  document.getElementById('heatHint').textContent = days.length ? (days[0] + ' ~ ' + days[days.length - 1] + ' · 深绿真实A 浅绿默认A 黄B 红C 灰未巡') : '暂无数据';
   chart.setOption({
-    tooltip: { formatter: p => yData[p.value[1]] + ' · ' + xData[p.value[0]] + '<br>' + labelOf(p.value[2]) + '<br><span style=color:#888>点击查看明细</span>' },
+    tooltip: { formatter: p => yData[p.value[1]] + ' · ' + xData[p.value[0]] + '<br>' + heatLabel(p.value[2]) + '<br><span style=color:#888>点击查看明细</span>' },
     grid: { left: 60, right: 20, top: 10, bottom: 30 },
     xAxis: { type: 'category', data: xData, axisLabel: { rotate: 45, fontSize: 10 }, splitArea: { show: true } },
     yAxis: { type: 'category', data: yData, splitArea: { show: true } },
-    visualMap: { min: 0, max: 3, calculable: false, orient: 'horizontal', left: 'center', bottom: 0,
-      pieces: [{ value: 0, label: '未巡', color: '#eef0f4' }, { value: 0.5, label: '巡', color: '#a9c4e8' }, { value: 1, label: 'C', color: '#e74c3c' }, { value: 2, label: 'B', color: '#ffc107' }, { value: 3, label: 'A', color: '#4caf50' }] },
+    visualMap: { min: 0, max: 4, calculable: false, orient: 'horizontal', left: 'center', bottom: 0,
+      pieces: [
+        { value: 0, label: '未巡', color: '#eef0f4' },
+        { value: 4, label: '默认A', color: '#cde8cd' },
+        { value: 3, label: 'A', color: '#4caf50' },
+        { value: 2, label: 'B', color: '#ffc107' },
+        { value: 1, label: 'C', color: '#e74c3c' }
+      ] },
     series: [{ type: 'heatmap', data,
-      label: { show: true, fontSize: 9, formatter: p => { const m = { 3: 'A', 2: 'B', 1: 'C', 0.5: '巡', 0: '' }; return m[p.value[2]] || ''; } },
+      label: { show: true, fontSize: 9, formatter: p => { const m = { 3: 'A', 2: 'B', 1: 'C', 4: '默', 0: '' }; return m[p.value[2]] || ''; } },
       itemStyle: { borderWidth: 1, borderColor: '#fff' },
       emphasis: { itemStyle: { shadowBlur: 6, shadowColor: 'rgba(0,0,0,.3)' } } }]
   }, true);
   chart.off('click');
   chart.on('click', p => { if (p.value[4]) showDetail(p.value[3], p.value[4]); });
 }
-function labelOf(v) { if (v === 3) return '课堂纪律：A'; if (v === 2) return '课堂纪律：B'; if (v === 1) return '课堂纪律：C'; if (v === 0.5) return '已巡课（无评分）'; return '未巡课'; }
 
 // ---------- 三维评分分布 ----------
 function renderScore() {
@@ -254,8 +287,15 @@ function renderScore() {
   if (!window.echarts) return;
   const chart = echarts.getInstanceByDom(el) || echarts.init(el);
   const f = filteredRecords();
+  const dates = [...new Set(f.map(r => r.date))].sort();
+  const classIds = state.filters.classId ? [state.filters.classId] : state.classes.map(c => c.id);
   const counts = DIMS.map(() => ({ A: 0, B: 0, C: 0 }));
-  f.forEach(r => DIMS.forEach((d, i) => { const v = scOf(r, d); if (v in counts[i]) counts[i][v]++; }));
+  classIds.forEach(cid => dates.forEach(dt => state.periods.forEach(p => {
+    DIMS.forEach((dim, i) => {
+      const g = gradeOf(cid, dt, p.period, dim);
+      if (g === 'A') counts[i].A++; else if (g === 'B') counts[i].B++; else if (g === 'C') counts[i].C++;
+    });
+  })));
   chart.setOption({
     tooltip: { trigger: 'axis' }, legend: { bottom: 0 },
     grid: { left: 40, right: 16, top: 10, bottom: 40 },
