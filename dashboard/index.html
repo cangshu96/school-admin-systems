@@ -97,6 +97,7 @@ header .sub{font-size:12px;opacity:.85;margin-top:2px;}
     </span>
   </label>
   <label>班级 <select id="classSel"><option value="">全部班级</option></select></label>
+  <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="realOnlyChk"> 只看真实评分</label>
   <button class="btn btn-plain" id="resetBtn">重置</button>
 </div>
 <div class="container">
@@ -119,6 +120,10 @@ header .sub{font-size:12px;opacity:.85;margin-top:2px;}
           <div id="issueList"></div>
         </div>
       </div>
+    </div>
+    <div class="card full"><h3>课堂不良表现汇总 <span class="hint">评分 B/C 与备注负面项</span></h3>
+      <div id="badSummary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
+      <div id="badList" style="max-height:320px;overflow:auto"></div>
     </div>
     <div class="card"><h3>教师巡课工作量 <span class="hint">按巡课老师统计</span></h3><div class="chart" id="teacherChart" style="height:280px"></div></div>
     <div class="card"><h3>备注文本洞察 <span class="hint">巡课备注主题归类</span></h3><div class="chart" id="remarkChart" style="height:280px"></div></div>
@@ -168,7 +173,7 @@ const WDN = ['日', '一', '二', '三', '四', '五', '六'];
 let sb = null;
 let state = {
   grade: '', classes: [], records: [], periods: [], schedule: [], teachers: [], summary: [], issues: [],
-  filters: { dateFrom: '', dateTo: '', weekdays: [], classId: '' },
+  filters: { dateFrom: '', dateTo: '', weekdays: [], classId: '', realOnly: false },
   clsMap: {}, perMap: {}, subjMap: {}
 };
 function todayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
@@ -292,7 +297,7 @@ function heatVal(cid, dt) {
   if (real === 'A') return 3;
   if (real === 'B') return 2;
   if (real === 'C') return 1;
-  return 4;
+  return state.filters.realOnly ? 0 : 4;
 }
 function heatLabel(v) {
   if (v === 3) return '课堂纪律：真实A';
@@ -636,6 +641,33 @@ function renderPeriod() {
   });
 }
 
+// ---------- 课堂不良表现汇总 ----------
+function renderBad() {
+  const f = filteredRecords();
+  const negKw = ['讲话', '吵闹', '打闹', '喧哗', '嘈杂', '走神', '打瞌睡', '睡觉', '趴桌', '玩', '手机', '迟到', '乱', '脏', '垃圾', '卫生差', '纪律'];
+  const items = [];
+  f.forEach(r => {
+    const g = gradeVal(r);
+    if (g === 'B' || g === 'C') {
+      const dims = DIMS.filter(d => scOf(r, d) && scOf(r, d) !== 'A').map(d => d + scOf(r, d));
+      items.push({ date: r.date, cid: r.class_id, period: r.period, type: g === 'C' ? '评分C' : '评分B', text: dims.join(' ') || g + '等' });
+    }
+    const rm = (r.remark || '').trim();
+    if (rm && negKw.some(k => rm.includes(k))) items.push({ date: r.date, cid: r.class_id, period: r.period, type: '备注', text: rm });
+  });
+  items.sort((a, b) => (a.date < b.date ? 1 : -1));
+  const cnt = {};
+  items.forEach(i => cnt[i.cid] = (cnt[i.cid] || 0) + 1);
+  const st = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 20).map(e =>
+    '<span style="font-size:12px;padding:3px 10px;border-radius:12px;background:#fdecea;color:#c0392b">' + clsName(e[0]) + ' <b>' + e[1] + '</b></span>').join('');
+  document.getElementById('badSummary').innerHTML = items.length ? st : '<span style="font-size:13px;color:#27ae60">范围内无不良表现记录</span>';
+  const rows = items.slice(0, 80).map(i => '<tr><td>' + i.date + '</td><td>' + clsName(i.cid) + '</td><td>' + periodLabel(i.period) + '</td><td>' + i.type + '</td><td style="text-align:left">' + (i.text || '') + '</td></tr>').join('');
+  document.getElementById('badList').innerHTML = items.length
+    ? '<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:#f0f3f9"><th style="padding:4px 6px;border:1px solid var(--bd)">日期</th><th style="padding:4px 6px;border:1px solid var(--bd)">班级</th><th style="padding:4px 6px;border:1px solid var(--bd)">节次</th><th style="padding:4px 6px;border:1px solid var(--bd)">来源</th><th style="padding:4px 6px;border:1px solid var(--bd)">内容</th></tr>' + rows + '</table>'
+      + (items.length > 80 ? '<div style="font-size:11px;color:#aaa;margin-top:6px">仅显示最近 80 条，共 ' + items.length + ' 条</div>' : '')
+    : '<div class="msg" style="padding:16px 0">暂无不良表现记录</div>';
+}
+
 // ---------- B6 年级横向对比（总览） ----------
 let ovLoaded = null;
 function ovChart(id) { const el = document.getElementById(id); return (el && window.echarts) ? (echarts.getInstanceByDom(el) || echarts.init(el)) : null; }
@@ -716,7 +748,7 @@ function renderOverview() {
 }
 
 // ---------- 联动渲染 ----------
-function render() { renderKPI(); renderHeat(); renderScore(); renderTrend(); renderZuoban(); renderSubject(); renderAlerts(); renderIssues(); renderTeacher(); renderRemark(); renderCompare(); renderPeriod(); }
+function render() { renderKPI(); renderHeat(); renderScore(); renderTrend(); renderZuoban(); renderSubject(); renderAlerts(); renderIssues(); renderTeacher(); renderRemark(); renderCompare(); renderPeriod(); renderBad(); }
 
 // ---------- 筛选事件 ----------
 document.getElementById('wdChips').addEventListener('click', e => {
@@ -737,6 +769,7 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   document.querySelectorAll('#wdChips .chip').forEach(c => c.classList.remove('active'));
   render();
 });
+document.getElementById('realOnlyChk').addEventListener('change', e => { state.filters.realOnly = e.target.checked; render(); });
 document.getElementById('gradeSwitch').addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
   document.querySelectorAll('#gradeSwitch button').forEach(b => b.classList.remove('active'));
@@ -747,7 +780,7 @@ document.getElementById('gradeSwitch').addEventListener('click', e => {
   loadGrade(btn.dataset.suffix);
 });
 function resetFilters() {
-  state.filters = { dateFrom: '', dateTo: '', weekdays: [], classId: '' };
+  state.filters = { dateFrom: '', dateTo: '', weekdays: [], classId: '', realOnly: state.filters.realOnly || false };
   document.getElementById('dateFrom').value = ''; document.getElementById('dateTo').value = '';
   document.querySelectorAll('#wdChips .chip').forEach(c => c.classList.remove('active'));
 }
