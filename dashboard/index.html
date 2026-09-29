@@ -174,7 +174,7 @@ let sb = null;
 let state = {
   grade: '', classes: [], records: [], periods: [], schedule: [], teachers: [], summary: [], issues: [],
   filters: { dateFrom: '', dateTo: '', weekdays: [], classId: '', realOnly: false },
-  clsMap: {}, perMap: {}, subjMap: {}
+  clsMap: {}, perMap: {}, subjMap: {}, teaMap: {}
 };
 function todayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function wdOf(dateStr) { return new Date(dateStr + 'T00:00:00').getDay(); }
@@ -241,10 +241,10 @@ async function loadGrade(suffix) {
     state.classes = classes.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     state.records = records; state.periods = periods; state.schedule = schedule;
     state.teachers = teachers; state.summary = summary; state.issues = issues;
-    state.clsMap = {}; state.perMap = {}; state.subjMap = {};
+    state.clsMap = {}; state.perMap = {}; state.subjMap = {}; state.teaMap = {};
     state.classes.forEach(c => state.clsMap[c.id] = c.name);
     state.periods.forEach(p => state.perMap[p.period] = p.label || ('第' + p.period + '节'));
-    schedule.forEach(s => state.subjMap[s.class_id + '_' + s.weekday + '_' + s.period] = s.subject);
+    schedule.forEach(s => { state.subjMap[s.class_id + '_' + s.weekday + '_' + s.period] = s.subject; if (s.teacher_name) state.teaMap[s.class_id + '_' + s.weekday + '_' + s.period] = s.teacher_name; });
     state.recMap = {};
     state.records.forEach(r => { state.recMap[r.class_id + '_' + r.date + '_' + r.period] = r; });
     state.dates = [...new Set(state.records.map(r => r.date))].sort();
@@ -651,10 +651,14 @@ function renderBad() {
     const g = gradeVal(r);
     if (g === 'B' || g === 'C') {
       const dims = DIMS.filter(d => scOf(r, d) && scOf(r, d) !== 'A').map(d => d + scOf(r, d));
-      items.push({ date: r.date, cid: r.class_id, period: r.period, type: g === 'C' ? '评分C' : '评分B', text: dims.join(' ') || g + '等' });
+      const key = r.class_id + '_' + wdOf(r.date) + '_' + r.period;
+      items.push({ date: r.date, cid: r.class_id, period: r.period, type: g === 'C' ? '评分C' : '评分B', subj: state.subjMap[key] || '-', tea: state.teaMap[key] || '-', text: dims.join(' ') || g + '等' });
     }
     const rm = (r.remark || '').trim();
-    if (rm && negKw.some(k => rm.includes(k))) items.push({ date: r.date, cid: r.class_id, period: r.period, type: '备注', text: rm });
+    if (rm && negKw.some(k => rm.includes(k))) {
+      const key2 = r.class_id + '_' + wdOf(r.date) + '_' + r.period;
+      items.push({ date: r.date, cid: r.class_id, period: r.period, type: '备注', subj: state.subjMap[key2] || '-', tea: state.teaMap[key2] || '-', text: rm });
+    }
   });
   items.sort((a, b) => (a.date < b.date ? 1 : -1));
   const cnt = {};
@@ -667,9 +671,9 @@ function renderBad() {
     + (sel ? '<span onclick="setBadCls(\'\')" style="cursor:pointer;font-size:12px;padding:3px 10px;border-radius:12px;background:#e8ebf1;color:#555">✕ 取消筛选</span>' : '');
   document.getElementById('badSummary').innerHTML = items.length ? st : '<span style="font-size:13px;color:#27ae60">范围内无不良表现记录</span>';
   const shown = sel ? items.filter(i => i.cid === sel) : items;
-  const rows = shown.slice(0, 80).map(i => '<tr><td>' + i.date + '</td><td>' + clsName(i.cid) + '</td><td>' + periodLabel(i.period) + '</td><td>' + i.type + '</td><td style="text-align:left">' + (i.text || '') + '</td></tr>').join('');
+  const rows = shown.slice(0, 80).map(i => '<tr><td>' + i.date + '</td><td>' + clsName(i.cid) + '</td><td>' + periodLabel(i.period) + '</td><td>' + (i.subj || '-') + '</td><td>' + (i.tea || '-') + '</td><td>' + i.type + '</td><td style="text-align:left">' + (i.text || '') + '</td></tr>').join('');
   document.getElementById('badList').innerHTML = shown.length
-    ? '<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:#f0f3f9"><th style="padding:4px 6px;border:1px solid var(--bd)">日期</th><th style="padding:4px 6px;border:1px solid var(--bd)">班级</th><th style="padding:4px 6px;border:1px solid var(--bd)">节次</th><th style="padding:4px 6px;border:1px solid var(--bd)">来源</th><th style="padding:4px 6px;border:1px solid var(--bd)">内容</th></tr>' + rows + '</table>'
+    ? '<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:#f0f3f9"><th style="padding:4px 6px;border:1px solid var(--bd)">日期</th><th style="padding:4px 6px;border:1px solid var(--bd)">班级</th><th style="padding:4px 6px;border:1px solid var(--bd)">节次</th><th style="padding:4px 6px;border:1px solid var(--bd)">科目</th><th style="padding:4px 6px;border:1px solid var(--bd)">任课老师</th><th style="padding:4px 6px;border:1px solid var(--bd)">来源</th><th style="padding:4px 6px;border:1px solid var(--bd)">内容</th></tr>' + rows + '</table>'
       + (shown.length > 80 ? '<div style="font-size:11px;color:#aaa;margin-top:6px">仅显示最近 80 条，共 ' + shown.length + ' 条</div>' : '')
     : '<div class="msg" style="padding:16px 0">暂无不良表现记录</div>';
 }
