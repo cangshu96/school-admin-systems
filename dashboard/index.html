@@ -4,8 +4,32 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>教学管理数据驾驶舱</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js" onerror="this.onerror=null;this.src='https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js'"></script>
-<script src="https://cdn.staticfile.org/echarts/5.5.0/echarts.min.js" onerror="this.onerror=null;this.src='https://cangshu96.github.io/school-admin-systems/vendor/echarts.min.js'"></script>
+<script>
+// 动态加载 echarts 与 supabase-js，带超时多源回退，避免同步阻塞导致打不开
+function loadScript(src, ms) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    let done = false;
+    const t = setTimeout(() => { if (!done) { done = true; s.onload = s.onerror = null; s.remove(); rej(new Error('超时 ' + src)); } }, ms);
+    s.onload = () => { if (!done) { done = true; clearTimeout(t); res(); } };
+    s.onerror = () => { if (!done) { done = true; clearTimeout(t); rej(new Error('失败 ' + src)); } };
+    s.src = src; document.head.appendChild(s);
+  });
+}
+async function loadLibs() {
+  const E = [
+    ['https://cdn.staticfile.org/echarts/5.5.0/echarts.min.js', 6000],
+    ['https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js', 6000],
+    ['https://cangshu96.github.io/school-admin-systems/vendor/echarts.min.js', 25000]
+  ];
+  const S = [
+    ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js', 6000],
+    ['https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js', 25000]
+  ];
+  if (!window.echarts) { for (const [src, ms] of E) { try { await loadScript(src, ms); break; } catch (e) {} } }
+  if (!window.supabase) { for (const [src, ms] of S) { try { await loadScript(src, ms); break; } catch (e) {} } }
+}
+</script>
 <style>
 :root{--pri:#2B579A;--accent:#1F3864;--bg:#f4f6fb;--card:#fff;--bd:#e3e8f0;--text:#333;--muted:#8a94a6;}
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -462,8 +486,16 @@ window.addEventListener('resize', () => {
   ['heatChart', 'scoreChart', 'trendChart', 'zuobanChart', 'subjectChart'].forEach(id => { const c = echarts.getInstanceByDom(document.getElementById(id)); if (c) c.resize(); });
 });
 (async function init() {
-  sb = supabase.createClient(EMBEDDED_CONFIG.supabaseUrl, EMBEDDED_CONFIG.supabaseKey);
-  await loadGrade('');
+  try {
+    await loadLibs();
+    if (!window.supabase) throw new Error('supabase SDK 加载失败');
+    sb = supabase.createClient(EMBEDDED_CONFIG.supabaseUrl, EMBEDDED_CONFIG.supabaseKey);
+    await loadGrade('');
+  } catch (e) {
+    console.error(e);
+    document.getElementById('kpiRow').innerHTML = '<div class="msg">资源加载失败，请刷新重试：' + e.message + '</div>';
+    showLoading(false);
+  }
 })();
 </script>
 </body>
