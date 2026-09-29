@@ -642,6 +642,7 @@ function renderPeriod() {
 }
 
 // ---------- 课堂不良表现汇总 ----------
+function setBadCls(cid) { state.badCls = cid; renderBad(); }
 function renderBad() {
   const f = filteredRecords();
   const negKw = ['讲话', '吵闹', '打闹', '喧哗', '嘈杂', '走神', '打瞌睡', '睡觉', '趴桌', '玩', '手机', '迟到', '乱', '脏', '垃圾', '卫生差', '纪律'];
@@ -658,13 +659,18 @@ function renderBad() {
   items.sort((a, b) => (a.date < b.date ? 1 : -1));
   const cnt = {};
   items.forEach(i => cnt[i.cid] = (cnt[i.cid] || 0) + 1);
-  const st = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 20).map(e =>
-    '<span style="font-size:12px;padding:3px 10px;border-radius:12px;background:#fdecea;color:#c0392b">' + clsName(e[0]) + ' <b>' + e[1] + '</b></span>').join('');
+  const sel = (state.badCls && cnt[state.badCls]) ? state.badCls : '';
+  const st = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 20).map(e => {
+    const on = e[0] === sel;
+    return '<span onclick="setBadCls(\'' + e[0] + '\')" style="cursor:pointer;font-size:12px;padding:3px 10px;border-radius:12px;background:' + (on ? '#c0392b' : '#fdecea') + ';color:' + (on ? '#fff' : '#c0392b') + '">' + clsName(e[0]) + ' <b>' + e[1] + '</b></span>';
+  }).join('')
+    + (sel ? '<span onclick="setBadCls(\'\')" style="cursor:pointer;font-size:12px;padding:3px 10px;border-radius:12px;background:#e8ebf1;color:#555">✕ 取消筛选</span>' : '');
   document.getElementById('badSummary').innerHTML = items.length ? st : '<span style="font-size:13px;color:#27ae60">范围内无不良表现记录</span>';
-  const rows = items.slice(0, 80).map(i => '<tr><td>' + i.date + '</td><td>' + clsName(i.cid) + '</td><td>' + periodLabel(i.period) + '</td><td>' + i.type + '</td><td style="text-align:left">' + (i.text || '') + '</td></tr>').join('');
-  document.getElementById('badList').innerHTML = items.length
+  const shown = sel ? items.filter(i => i.cid === sel) : items;
+  const rows = shown.slice(0, 80).map(i => '<tr><td>' + i.date + '</td><td>' + clsName(i.cid) + '</td><td>' + periodLabel(i.period) + '</td><td>' + i.type + '</td><td style="text-align:left">' + (i.text || '') + '</td></tr>').join('');
+  document.getElementById('badList').innerHTML = shown.length
     ? '<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="background:#f0f3f9"><th style="padding:4px 6px;border:1px solid var(--bd)">日期</th><th style="padding:4px 6px;border:1px solid var(--bd)">班级</th><th style="padding:4px 6px;border:1px solid var(--bd)">节次</th><th style="padding:4px 6px;border:1px solid var(--bd)">来源</th><th style="padding:4px 6px;border:1px solid var(--bd)">内容</th></tr>' + rows + '</table>'
-      + (items.length > 80 ? '<div style="font-size:11px;color:#aaa;margin-top:6px">仅显示最近 80 条，共 ' + items.length + ' 条</div>' : '')
+      + (shown.length > 80 ? '<div style="font-size:11px;color:#aaa;margin-top:6px">仅显示最近 80 条，共 ' + shown.length + ' 条</div>' : '')
     : '<div class="msg" style="padding:16px 0">暂无不良表现记录</div>';
 }
 
