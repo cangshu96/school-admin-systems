@@ -282,7 +282,7 @@ function renderHeat() {
     const v = heatVal(c.id, dt);
     data.push([xi, yi, v, c.id, dt]);
   }));
-  document.getElementById('heatHint').textContent = days.length ? (days[0] + ' ~ ' + days[days.length - 1] + ' · 深绿真实A 浅绿默认A 黄B 红C 灰未巡') : '暂无数据';
+  document.getElementById('heatHint').textContent = days.length ? (days[0] + ' ~ ' + days[days.length - 1] + ' · 深绿真实A 浅蓝默认A 黄B 红C 灰未巡') : '暂无数据';
   chart.setOption({
     tooltip: { formatter: p => yData[p.value[1]] + ' · ' + xData[p.value[0]] + '<br>' + heatLabel(p.value[2]) + '<br><span style=color:#888>点击查看明细</span>' },
     grid: { left: 60, right: 20, top: 10, bottom: 30 },
@@ -291,7 +291,7 @@ function renderHeat() {
     visualMap: { min: 0, max: 4, calculable: false, orient: 'horizontal', left: 'center', bottom: 0,
       pieces: [
         { value: 0, label: '未巡', color: '#eef0f4' },
-        { value: 4, label: '默认A', color: '#cde8cd' },
+        { value: 4, label: '默认A', color: '#a7cff2' },
         { value: 3, label: 'A', color: '#4caf50' },
         { value: 2, label: 'B', color: '#ffc107' },
         { value: 1, label: 'C', color: '#e74c3c' }
