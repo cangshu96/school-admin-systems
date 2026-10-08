@@ -27,7 +27,16 @@ async function loadLibs() {
     ['https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js', 25000]
   ];
   if (!window.echarts) { for (const [src, ms] of E) { try { await loadScript(src, ms); break; } catch (e) {} } }
-  if (!window.supabase) { for (const [src, ms] of S) { try { await loadScript(src, ms); break; } catch (e) {} } }
+  if (!window.supabase) {
+    const race = ps => new Promise((res, rej) => { let n = ps.length; const errs = []; ps.forEach(p => p.then(res, e => { errs.push(e); if (--n === 0) rej(errs[0]); })); });
+    try {
+      await race([
+        loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js', 15000),
+        loadScript('https://unpkg.com/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js', 15000)
+      ]);
+    } catch (e) {}
+    if (!window.supabase) { try { await loadScript('https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js', 25000); } catch (e) {} }
+  }
 }
 </script>
 <style>
