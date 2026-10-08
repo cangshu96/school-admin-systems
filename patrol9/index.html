@@ -694,7 +694,30 @@ body { font-size: 16px; line-height: 1.5; }
   <img id="photoModalImg" src="">
 </div>
 
-<script src="https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js"></script>
+<script>
+// supabase-js 动态多源加载（同步 github.io 阻塞页面导致登录页一直“正在加载数据”，已改为动态回退）
+function loadScript(src, ms) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    let done = false;
+    const t = setTimeout(() => { if (!done) { done = true; s.onload = s.onerror = null; s.remove(); rej(new Error('超时 ' + src)); } }, ms);
+    s.onload = () => { if (!done) { done = true; clearTimeout(t); res(); } };
+    s.onerror = () => { if (!done) { done = true; clearTimeout(t); rej(new Error('失败 ' + src)); } };
+    s.src = src; document.head.appendChild(s);
+  });
+}
+async function loadSupabaseLib() {
+  if (window.supabase) return;
+  const race = ps => new Promise((res, rej) => { let n = ps.length; const errs = []; ps.forEach(p => p.then(res, e => { errs.push(e); if (--n === 0) rej(errs[0]); })); });
+  try {
+    await race([
+      loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js', 15000),
+      loadScript('https://unpkg.com/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js', 15000)
+    ]);
+  } catch (e) {}
+  if (!window.supabase) { try { await loadScript('https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js', 25000); } catch (e) {} }
+}
+</script>
 
 <script>
 // ============ 按需加载库 ============
@@ -3219,6 +3242,7 @@ function logout() {
 }
 
 async function init() {
+  await loadSupabaseLib();
   initSupabase();
   await loadData();
   if (state.classes.length === 0) {
