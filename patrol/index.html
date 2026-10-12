@@ -762,14 +762,15 @@ function schedulePatrolSave(dateStr, classId, period) {
 
 
 
+<script src="config.js"></script>
 <script>
 // ============================================
-// 配置
+// 配置（双端部署：优先读取同目录 config.js 的 window.APP_CONFIG，未提供时回退内嵌默认）
 // ============================================
-const EMBEDDED_CONFIG = {
+const EMBEDDED_CONFIG = Object.assign({
   supabaseUrl: 'https://vigzdhhrqjmbtwewgcrz.supabase.co',
   supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ3pkaGhycWptYnR3ZXdnY3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDI2NjksImV4cCI6MjEwMjcxODY2OX0.JNw_f2j776kVcVBLbtmScXMs_KU5ZOeyockBIFbT8oU'
-};
+}, window.APP_CONFIG || {});
 const ADMIN_PASSWORD = 'EQjwc';
 const PATROL_GROUPS = ['语文', '数学', '英语', '道法', '历史', '综合组'];
 
