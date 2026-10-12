@@ -172,11 +172,13 @@ header .sub{font-size:12px;opacity:.85;margin-top:2px;}
     </div>
   </div>
 </div>
+<script src="config.js"></script>
 <script>
-const EMBEDDED_CONFIG = {
+// 双端部署：优先读取同目录 config.js 的 window.APP_CONFIG，未提供时回退内嵌默认
+const EMBEDDED_CONFIG = Object.assign({
   supabaseUrl: 'https://vigzdhhrqjmbtwewgcrz.supabase.co',
   supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpZ3pkaGhycWptYnR3ZXdnY3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDI2NjksImV4cCI6MjEwMjcxODY2OX0.JNw_f2j776kVcVBLbtmScXMs_KU5ZOeyockBIFbT8oU'
-};
+}, window.APP_CONFIG || {});
 const DIMS = ['学习状态', '教室环境', '课堂纪律'];
 const WDN = ['日', '一', '二', '三', '四', '五', '六'];
 let sb = null;
