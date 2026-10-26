@@ -16,7 +16,7 @@ function loadScript(src, ms) {
     s.src = src; document.head.appendChild(s);
   });
 }
-async function loadLibs() {
+async function loadLibs(skipSupabase) {
   const E = [
     ['https://cdn.staticfile.org/echarts/5.5.0/echarts.min.js', 6000],
     ['https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js', 6000],
@@ -27,7 +27,7 @@ async function loadLibs() {
     ['https://cangshu96.github.io/school-admin-systems/vendor/supabase-js.min.js', 25000]
   ];
   if (!window.echarts) { for (const [src, ms] of E) { try { await loadScript(src, ms); break; } catch (e) {} } }
-  if (!window.supabase) {
+  if (!skipSupabase && !window.supabase) {
     const race = ps => new Promise((res, rej) => { let n = ps.length; const errs = []; ps.forEach(p => p.then(res, e => { errs.push(e); if (--n === 0) rej(errs[0]); })); });
     try {
       await race([
@@ -173,6 +173,7 @@ header .sub{font-size:12px;opacity:.85;margin-top:2px;}
   </div>
 </div>
 <script src="config.js"></script>
+<script src="cloudbase-adapter.js"></script>
 <script>
 // 双端部署：优先读取同目录 config.js 的 window.APP_CONFIG，未提供时回退内嵌默认
 const EMBEDDED_CONFIG = Object.assign({
@@ -810,9 +811,15 @@ window.addEventListener('resize', () => {
 });
 (async function init() {
   try {
-    await loadLibs();
-    if (!window.supabase) throw new Error('supabase SDK 加载失败');
-    sb = supabase.createClient(EMBEDDED_CONFIG.supabaseUrl, EMBEDDED_CONFIG.supabaseKey);
+    if (EMBEDDED_CONFIG.backend === 'cloudbase') {
+      // CloudBase PG 模式：无需 supabase 库，兼容层直连 PostgREST；仅加载 echarts
+      await loadLibs(true);
+      sb = window.createCloudBaseClient({ envId: EMBEDDED_CONFIG.envId, publishableKey: EMBEDDED_CONFIG.publishableKey });
+    } else {
+      await loadLibs();
+      if (!window.supabase) throw new Error('supabase SDK 加载失败');
+      sb = supabase.createClient(EMBEDDED_CONFIG.supabaseUrl, EMBEDDED_CONFIG.supabaseKey);
+    }
     await loadGrade('');
   } catch (e) {
     console.error(e);
