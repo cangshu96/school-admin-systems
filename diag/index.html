@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>手机端网络诊断</title>
+<style>
+  body{font-family:-apple-system,"PingFang SC",sans-serif;background:#f5f6fa;margin:0;padding:16px;color:#333;font-size:15px}
+  h2{font-size:17px;color:#2B579A}
+  .item{background:#fff;border-radius:10px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .lab{color:#888;font-size:13px}
+  .val{font-weight:600;margin-top:4px;word-break:break-all}
+  .ok{color:#27ae60}.bad{color:#e74c3c}.warn{color:#e67e22}
+  button{background:#2B579A;color:#fff;border:0;border-radius:8px;padding:12px 22px;font-size:16px;width:100%}
+</style>
+</head>
+<body>
+<h2>巡课系统 · 手机端网络诊断</h2>
+<div id="out"><div class="item">点击下方按钮开始测试各项连通性</div></div>
+<button onclick="runAll()">开始诊断</button>
+<script>
+const SB='https://vigzdhhrqjmbtwewgcrz.supabase.co/rest/v1/patrol_classes?select=id&limit=1';
+const GH='https://cangshu96.github.io/school-admin-systems/patrol/';
+function add(lab, cls, val){const d=document.createElement('div');d.className='item';d.innerHTML='<div class="lab">'+lab+'</div><div class="val '+cls+'">'+val+'</div>';document.getElementById('out').appendChild(d);}
+async function t(lab,url,note){
+  const s=performance.now();
+  try{
+    const r=await fetch(url,{cache:'no-store'});
+    const ms=Math.round(performance.now()-s);
+    add(lab+' ('+note+')', ms<3000?'ok':'warn', 'HTTP '+r.status+'，耗时 '+ms+'ms'+(ms>8000?' ⚠ 明显过慢':''));
+  }catch(e){
+    add(lab+' ('+note+')','bad','失败：'+e.message+'（手机网络无法连通，常见于校园WiFi/移动网络限制海外节点，或微信内置浏览器）');
+  }
+}
+async function runAll(){
+  document.getElementById('out').innerHTML='';
+  const ua=navigator.userAgent;
+  const wx=/MicroMessenger/i.test(ua);
+  add('浏览器内核', wx?'warn':'ok', wx?'微信内置浏览器（建议右上角→在浏览器打开）':ua.slice(0,90));
+  if(navigator.connection) add('网络类型','ok',navigator.connection.effectiveType+' / rtt '+navigator.connection.rtt+'ms');
+  await t('页面服务器 GitHub Pages',GH,'国内可达，应较快');
+  await t('数据服务器 Supabase（海外）',SB,'巡课数据在此，国内直连常慢/不通');
+  add('结论提示','warn','若 Supabase 一项失败或超过 5 秒，说明当前手机网络难以直连海外数据库——这正是“一直加载数据”的原因。请尝试：① 切换手机流量（勿用校园WiFi）② 用系统浏览器而非微信内置打开 ③ 根治需将数据库迁移国内节点。');
+}
+</script>
+</body>
+</html>
