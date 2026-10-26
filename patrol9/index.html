@@ -770,6 +770,7 @@ function schedulePatrolSave(dateStr, classId, period) {
 
 
 <script src="config.js"></script>
+<script src="cloudbase-adapter.js"></script>
 <script>
 // ============================================
 // 配置（双端部署：优先读取同目录 config.js 的 window.APP_CONFIG，未提供时回退内嵌默认）
@@ -938,7 +939,11 @@ function showToast(msg, type) {
 // Supabase 初始化
 // ============================================
 function initSupabase() {
-  sb = supabase.createClient(EMBEDDED_CONFIG.supabaseUrl, EMBEDDED_CONFIG.supabaseKey);
+  if (EMBEDDED_CONFIG.backend === 'cloudbase') {
+    sb = window.createCloudBaseClient({ envId: EMBEDDED_CONFIG.envId, publishableKey: EMBEDDED_CONFIG.publishableKey });
+  } else {
+    sb = supabase.createClient(EMBEDDED_CONFIG.supabaseUrl, EMBEDDED_CONFIG.supabaseKey);
+  }
 }
 
 // ============================================
@@ -1043,7 +1048,7 @@ async function loadPatrolPhotos(dateStr, period) {
     data.forEach(row => {
       const key = row.class_id + '_' + row.period;
       if (!state.photos[key]) state.photos[key] = [];
-      state.photos[key].push({ id: row.id, path: row.photo_path, url: row.photo_path ? getPhotoUrl(row.photo_path) : '' });
+      state.photos[key].push({ id: row.id, path: row.photo_path, url: row.photo_path ? getPhotoUrl(row.photo_path) : (row.photo_data || '') });
     });
   }
 }
@@ -1605,6 +1610,7 @@ function dataURLtoBlob(dataURL) {
 }
 function getPhotoUrl(path) {
   if (!path) return '';
+  if (EMBEDDED_CONFIG.backend === 'cloudbase') return path;
   const { data } = sb.storage.from('patrol-photos').getPublicUrl(path);
   return data.publicUrl;
 }
@@ -1637,6 +1643,26 @@ async function onPhotoSelected(classId, period, input) {
   try {
     const compressed = await compressImage(file, 400, 0.4);
     const photoId = 'ph_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+    if (EMBEDDED_CONFIG.backend === 'cloudbase') {
+      // cloudbase 模式：照片压缩后直接存 base64 到 photo_data 列（400px/0.4质量 ≈ 10-30KB）
+      const { error: e1 } = await sb.from(TB('patrol_photos')).insert({
+        id: photoId, date: state.viewDate, class_id: classId, period: period,
+        photo_path: null, photo_data: compressed
+      });
+      if (e1) throw e1;
+      const key0 = classId + '_' + period;
+      if (!state.records[key0]) state.records[key0] = { scores: {}, reasons: {}, remark: '', special: '', has_photo: false };
+      state.records[key0].has_photo = true;
+      state.records[key0].inspector = state.teacher;
+      await savePatrolRecord(state.viewDate, classId, period, state.records[key0]);
+      if (!state.photos[key0]) state.photos[key0] = [];
+      state.photos[key0].push({ id: photoId, path: null, url: compressed });
+      hideLoading();
+      renderPatrolCard(classId, period);
+      showToast('照片已上传', 'success');
+      input.value = '';
+      return;
+    }
     // Upload compressed image to Supabase Storage
     const blob = dataURLtoBlob(compressed);
     const filePath = state.viewDate + '/' + classId + '_' + period + '_' + photoId + '.jpg';
@@ -1680,7 +1706,7 @@ async function deletePhoto(classId, period, photoIdx) {
   try {
     // Remove storage object if path exists
     if (ph.path) {
-      await sb.storage.from('patrol-photos').remove([ph.path]);
+      if (EMBEDDED_CONFIG.backend !== 'cloudbase') await sb.storage.from('patrol-photos').remove([ph.path]);
     }
     const { error } = await sb.from(TB('patrol_photos')).delete().eq('id', ph.id);
     if (error) throw error;
@@ -3274,7 +3300,7 @@ function logout() {
 }
 
 async function init() {
-  await loadSupabaseLib();
+  if (EMBEDDED_CONFIG.backend !== 'cloudbase') await loadSupabaseLib();
   initSupabase();
   await loadData();
   if (state.classes.length === 0) {
