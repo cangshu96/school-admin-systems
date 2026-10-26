@@ -977,14 +977,38 @@ async function loadCalendar() {
     if (!error && data) data.forEach(r => { state.calendar[r.date] = r.weekday; });
   } catch (e) { state.calendar = {}; }
 }
+// 带超时的单次查询（手机网络对海外节点可能长时间挂起，超时后快速失败重试）
+function withTimeout(promise, ms, label) {
+  return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error((label || '请求') + '超时(' + (ms/1000) + 's)')), ms))]);
+}
+async function loadWithRetry(fn, label, tries) {
+  tries = tries || 3;
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await withTimeout(fn(), 10000, label);
+    } catch (e) {
+      lastErr = e;
+      showLoading('加载数据：' + label + ' 第' + (i + 2) + '次尝试…');
+      await new Promise(r => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  throw new Error(label + '加载失败：' + (lastErr && lastErr.message || '网络不可达'));
+}
 async function loadData() {
-  showLoading('加载数据...');
+  showLoading('加载数据…');
   try {
-    await Promise.all([loadClasses(), loadTeachers(), loadPeriods(), loadSchedule(), loadCalendar()]);
+    await Promise.all([
+      loadWithRetry(loadClasses, '班级'),
+      loadWithRetry(loadTeachers, '教师'),
+      loadWithRetry(loadPeriods, '节次'),
+      loadWithRetry(loadSchedule, '课表'),
+      loadWithRetry(loadCalendar, '日历')
+    ]);
     hideLoading();
   } catch (err) {
     hideLoading();
-    showToast('数据加载失败：' + err.message, 'error');
+    showToast('数据加载失败：' + err.message + '（请检查手机网络后重试；若用微信内置浏览器打开，请点右上角选择在浏览器中打开）', 'error');
   }
 }
 
